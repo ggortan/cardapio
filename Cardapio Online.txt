@@ -1,0 +1,59 @@
+# Digital Menu Application
+
+## Project Structure
+```
+digital-menu/
+│
+├── config/
+│   ├── database.php
+│   └── config.php
+│
+├── includes/
+│   ├── header.php
+│   ├── footer.php
+│   └── functions.php
+│
+├── admin/
+│   ├── categorias.php
+│   ├── produtos.php
+│   └── pedidos.php
+│
+├── public/
+│   ├── index.php
+│   ├── cardapio.php
+│   ├── carrinho.php
+│   ├── finalizar-pedido.php
+│   └── meus-pedidos.php
+│
+├── assets/
+│   ├── css/
+│   ├── js/
+│   └── images/
+│
+├── login.php
+├── cadastro.php
+└── logout.php
+```
+
+## Requirements
+- PHP 7.4+
+- MySQL 5.7+
+- Bootstrap 5.x
+- PDO for database connections
+
+## Setup Instructions
+1. Clone the repository
+2. Import the SQL database schema
+3. Configure database connection in `config/database.php`
+4. Install dependencies (if using Composer)
+5. Run the application
+
+## Features
+- User registration and authentication
+- Digital menu with product categories
+- Shopping cart functionality
+- Order placement and tracking
+- Admin panel for managing categories, products, and orders
+```
+
+## Database Connection Configuration
