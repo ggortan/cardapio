@@ -4,6 +4,20 @@ session_start();
 require_once 'config/database.php';
 require_once 'includes/functions.php';
 
+// If already logged in, redirect to appropriate page
+if (isLoggedIn()) {
+    switch ($_SESSION['tipo_usuario']) {
+        case 'administrador':
+            redirectTo('admin/dashboard.php');
+            break;
+        case 'operador':
+            redirectTo('admin/pedidos.php');
+            break;
+        default:
+            redirectTo('public/cardapio.php');
+    }
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = sanitizeInput($_POST['email']);
     $senha = $_POST['senha'];
@@ -12,7 +26,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $database = new Database();
         $conn = $database->getConnection();
 
-        $stmt = $conn->prepare("SELECT id_usuario, nome, senha, tipo_usuario FROM Usuario WHERE email = :email AND status = 'ativo'");
+        $stmt = $conn->prepare("
+            SELECT id_usuario, nome, senha, tipo_usuario 
+            FROM Usuario 
+            WHERE email = :email AND status = 'ativo'
+        ");
         $stmt->bindParam(':email', $email);
         $stmt->execute();
 
@@ -50,32 +68,54 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta charset="UTF-8">
     <title>Login - Cardápio Digital</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+        }
+    </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">Login</div>
-                    <div class="card-body">
-                        <?php displayFlashMessage(); ?>
-                        <form method="POST" action="">
-                            <div class="mb-3">
-                                <label for="email" class="form-label">Email</label>
-                                <input type="email" class="form-control" id="email" name="email" required>
+    <div class="container">
+        <div class="login-container">
+            <div class="card shadow">
+                <div class="card-header text-center bg-primary text-white">
+                    <h3>Cardápio Digital</h3>
+                </div>
+                <div class="card-body">
+                    <?php displayFlashMessage(); ?>
+                    <form method="POST" action="">
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       placeholder="Digite seu email" required>
                             </div>
-                            <div class="mb-3">
-                                <label for="senha" class="form-label">Senha</label>
-                                <input type="password" class="form-control" id="senha" name="senha" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="senha" class="form-label">Senha</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                                <input type="password" class="form-control" id="senha" name="senha" 
+                                       placeholder="Digite sua senha" required>
                             </div>
-                            <button type="submit" class="btn btn-primary">Entrar</button>
-                            <a href="cadastro.php" class="btn btn-link">Cadastrar-se</a>
-                        </form>
-                    </div>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-box-arrow-in-right"></i> Entrar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center">
+                    <p class="mb-0">Novo por aqui? <a href="cadastro.php">Cadastre-se</a></p>
                 </div>
             </div>
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
 </body>
 </html>
