@@ -6,7 +6,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Define funções úteis para o cabeçalho
-$isAdmin = isset($_SESSION['tipo_usuario']) && in_array($_SESSION['tipo_usuario'], ['administrador', 'operador']);
+$isAdmin = isset($_SESSION['tipo_usuario']) && $_SESSION['tipo_usuario'] === 'administrador';
+$isOperator = isset($_SESSION['tipo_usuario']) && $_SESSION['tipo_usuario'] === 'operador';
 $isLoggedIn = isset($_SESSION['usuario_id']);
 
 // Define o caminho base para links, dependendo da localização do arquivo que inclui o cabeçalho
@@ -50,7 +51,7 @@ if (strpos($_SERVER['SCRIPT_NAME'], '/admin/') !== false) {
     <header>
         <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
             <div class="container">
-                <a class="navbar-brand" href="<?php echo $basePath; ?><?php echo $isAdmin ? 'admin/dashboard.php' : 'public/cardapio.php'; ?>">
+                <a class="navbar-brand" href="<?php echo $basePath; ?><?php echo ($isAdmin || $isOperator) ? 'admin/dashboard.php' : 'public/cardapio.php'; ?>">
                     <i class="bi bi-book"></i> Cardápio Digital
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -59,7 +60,7 @@ if (strpos($_SERVER['SCRIPT_NAME'], '/admin/') !== false) {
                 
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <?php if ($isLoggedIn): ?>
-                        <?php if ($isAdmin): ?>
+                        <?php if ($isAdmin || $isOperator): ?>
                             <!-- Menu Administrador/Operador -->
                             <ul class="navbar-nav">
                                 <li class="nav-item">
@@ -72,7 +73,7 @@ if (strpos($_SERVER['SCRIPT_NAME'], '/admin/') !== false) {
                                         <i class="bi bi-list-check"></i> Pedidos
                                     </a>
                                 </li>
-                                <?php if ($_SESSION['tipo_usuario'] === 'administrador'): ?>
+                                <?php if ($isAdmin): ?>
                                 <li class="nav-item">
                                     <a class="nav-link" href="<?php echo $basePath; ?>admin/produtos.php">
                                         <i class="bi bi-box"></i> Produtos
@@ -123,10 +124,13 @@ if (strpos($_SERVER['SCRIPT_NAME'], '/admin/') !== false) {
                                     <li><a class="dropdown-item text-danger" href="<?php echo $basePath; ?>logout.php">Sair</a></li>
                                 </ul>
                             </li>
-                            <?php if (!$isAdmin): ?>
+                            <?php if (!$isAdmin && !$isOperator): ?>
                             <li class="nav-item">
                                 <a href="<?php echo $basePath; ?>public/carrinho.php" class="btn btn-outline-success ms-2">
                                     <i class="bi bi-cart"></i> Carrinho
+                                    <?php if (isset($_SESSION['carrinho']) && !empty($_SESSION['carrinho'])): ?>
+                                        <span class="badge bg-danger rounded-pill"><?php echo count($_SESSION['carrinho']); ?></span>
+                                    <?php endif; ?>
                                 </a>
                             </li>
                             <?php endif; ?>

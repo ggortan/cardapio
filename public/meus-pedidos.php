@@ -53,61 +53,97 @@ try {
     flashMessage('Erro ao carregar pedidos: ' . $e->getMessage(), 'error');
     $pedidos = [];
 }
+
+require_once '../includes/header.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>Meus Pedidos</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container mt-4">
-        <h1>Meus Pedidos</h1>
-        
-        <?php displayFlashMessage(); ?>
+<style>
+    .status-badge {
+        min-width: 80px;
+    }
+    .pedido-card {
+        transition: transform 0.2s ease;
+    }
+    .pedido-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .detalhe-hidden {
+        display: none;
+    }
+</style>
 
-        <?php if (empty($pedidos)): ?>
-            <div class="alert alert-info">
-                Você ainda não realizou nenhum pedido. 
-                <a href="cardapio.php">Faça seu primeiro pedido!</a>
-            </div>
-        <?php else: ?>
-            <?php foreach ($pedidos as $pedido): ?>
-                <div class="card mb-3">
+<h1>Meus Pedidos</h1>
+
+<?php if (empty($pedidos)): ?>
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Você ainda não realizou nenhum pedido. 
+        <a href="cardapio.php" class="alert-link">Faça seu primeiro pedido!</a>
+    </div>
+<?php else: ?>
+    <div class="row row-cols-1 row-cols-md-2 g-4 mb-4">
+        <?php foreach ($pedidos as $pedido): ?>
+            <div class="col">
+                <div class="card pedido-card h-100">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <div>
-                            <strong>Pedido #<?php echo $pedido['id_pedido']; ?></strong>
-                            <span class="ms-2 badge 
-                                <?php 
-                                echo match($pedido['status']) {
-                                    'pendente' => 'bg-warning',
-                                    'preparando' => 'bg-info',
-                                    'pronto' => 'bg-primary',
-                                    'enviado' => 'bg-secondary',
-                                    'entregue' => 'bg-success',
-                                    'cancelado' => 'bg-danger',
-                                    default => 'bg-light text-dark'
-                                };
-                                ?>">
-                                <?php echo ucfirst($pedido['status']); ?>
-                            </span>
+                            <h5 class="mb-0">Pedido #<?php echo $pedido['id_pedido']; ?></h5>
+                            <small class="text-muted"><?php echo date('d/m/Y H:i', strtotime($pedido['data_pedido'])); ?></small>
                         </div>
-                        <small class="text-muted">
-                            <?php echo date('d/m/Y H:i', strtotime($pedido['data_pedido'])); ?>
-                        </small>
+                        <span class="badge status-badge 
+                            <?php 
+                            echo match($pedido['status']) {
+                                'pendente' => 'bg-warning',
+                                'preparando' => 'bg-info',
+                                'pronto' => 'bg-primary',
+                                'enviado' => 'bg-secondary',
+                                'entregue' => 'bg-success',
+                                'cancelado' => 'bg-danger',
+                                default => 'bg-light text-dark'
+                            };
+                            ?>">
+                            <?php echo ucfirst($pedido['status']); ?>
+                        </span>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-8">
-                                <h5>Itens do Pedido</h5>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <p class="mb-1"><strong>Forma de Entrega:</strong> <?php echo ucfirst($pedido['forma_entrega']); ?></p>
+                                <p class="mb-0">
+                                    <strong>Pagamento:</strong> 
+                                    <?php echo strtoupper($pedido['metodo_pagamento']); ?>
+                                    <span class="badge 
+                                        <?php 
+                                        echo match($pedido['status_pagamento']) {
+                                            'pendente' => 'bg-warning',
+                                            'aprovado' => 'bg-success',
+                                            'recusado' => 'bg-danger',
+                                            'estornado' => 'bg-secondary',
+                                            default => 'bg-light text-dark'
+                                        };
+                                        ?>">
+                                        <?php echo ucfirst($pedido['status_pagamento']); ?>
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="text-end">
+                                <h5 class="text-success mb-0"><?php echo formatCurrency($pedido['total']); ?></h5>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-sm btn-outline-primary toggle-details" data-pedido="<?php echo $pedido['id_pedido']; ?>">
+                            <i class="bi bi-list-ul"></i> Ver Itens
+                        </button>
+                        
+                        <div class="itens-pedido detalhe-hidden mt-3" id="itens-<?php echo $pedido['id_pedido']; ?>">
+                            <h6>Itens do Pedido</h6>
+                            <div class="table-responsive">
                                 <table class="table table-sm">
                                     <thead>
                                         <tr>
                                             <th>Produto</th>
-                                            <th>Quantidade</th>
-                                            <th>Preço Unitário</th>
+                                            <th>Qtd</th>
+                                            <th>Preço</th>
                                             <th>Subtotal</th>
                                         </tr>
                                     </thead>
@@ -126,40 +162,43 @@ try {
                                     </tbody>
                                 </table>
                             </div>
-                            <div class="col-md-4">
-                                <h5>Detalhes</h5>
-                                <p>
-                                    <strong>Forma de Entrega:</strong> 
-                                    <?php echo ucfirst($pedido['forma_entrega']); ?>
-                                </p>
-                                
-                                <p>
-                                    <strong>Pagamento:</strong> 
-                                    <?php echo strtoupper($pedido['metodo_pagamento']); ?> 
-                                    <span class="badge 
-                                        <?php 
-                                        echo match($pedido['status_pagamento']) {
-                                            'pendente' => 'bg-warning',
-                                            'aprovado' => 'bg-success',
-                                            'recusado' => 'bg-danger',
-                                            'estornado' => 'bg-secondary',
-                                            default => 'bg-light text-dark'
-                                        };
-                                        ?>">
-                                        <?php echo ucfirst($pedido['status_pagamento']); ?>
-                                    </span>
-                                </p>
-                                <p class="h4 text-success">
-                                    Total: <?php echo formatCurrency($pedido['total']); ?>
-                                </p>
-                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted"><i class="bi bi-clock-history"></i> Status atualizado com o progresso do pedido</small>
+                            <?php if ($pedido['status'] == 'pendente'): ?>
+                                <button class="btn btn-sm btn-outline-danger" disabled>
+                                    <i class="bi bi-x-circle"></i> Cancelar
+                                </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
-            <?php endforeach; ?>
-        <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
     </div>
+<?php endif; ?>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggleButtons = document.querySelectorAll('.toggle-details');
+        
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const pedidoId = this.getAttribute('data-pedido');
+                const detalhesDiv = document.getElementById('itens-' + pedidoId);
+                
+                if (detalhesDiv.classList.contains('detalhe-hidden')) {
+                    detalhesDiv.classList.remove('detalhe-hidden');
+                    this.innerHTML = '<i class="bi bi-x-lg"></i> Ocultar Itens';
+                } else {
+                    detalhesDiv.classList.add('detalhe-hidden');
+                    this.innerHTML = '<i class="bi bi-list-ul"></i> Ver Itens';
+                }
+            });
+        });
+    });
+</script>
+
+<?php require_once '../includes/footer.php'; ?>

@@ -10,6 +10,103 @@ if (!isLoggedIn()) {
     redirectTo('../login.php');
 }
 
+// Processar finalização do pedido
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['finalizar_pedido'])) {
+    $forma_entrega = filter_input(INPUT_POST, 'forma_entrega', FILTER_SANITIZE_STRING);
+    $observacoes = filter_input(INPUT_POST, 'observacoes', FILTER_SANITIZE_STRING);
+    $metodo_pagamento = filter_input(INPUT_POST, 'metodo_pagamento', FILTER_SANITIZE_STRING);
+    $endereco_id = $forma_entrega == 'delivery' ? 
+        filter_input(INPUT_POST, 'endereco_id', FILTER_VALIDATE_INT) : 
+        null;
+
+    // Verificar se o carrinho não está vazio
+    if (empty($_SESSION['carrinho'])) {
+        flashMessage('Seu carrinho está vazio', 'error');
+        redirectTo('cardapio.php');
+    }
+
+    // Validação para delivery
+    if ($forma_entrega == 'delivery' && !$endereco_id) {
+        flashMessage('Selecione um endereço de entrega', 'error');
+        redirectTo('carrinho.php');
+    }
+
+    try {
+        $database = new Database();
+        $conn = $database->getConnection();
+        $conn->beginTransaction();
+
+        // Calcular total do pedido
+        $total = 0;
+        foreach ($_SESSION['carrinho'] as $item) {
+            $total += $item['preco'] * $item['quantidade'];
+        }
+
+        // Inserir pedido
+        $stmt = $conn->prepare("
+            INSERT INTO Pedido (
+                id_usuario, status, forma_entrega, 
+                id_endereco, total, observacoes
+            ) VALUES (
+                :usuario_id, 'pendente', :forma_entrega, 
+                :endereco_id, :total, :observacoes
+            )
+        ");
+        $stmt->bindParam(':usuario_id', $_SESSION['usuario_id']);
+        $stmt->bindParam(':forma_entrega', $forma_entrega);
+        $stmt->bindParam(':endereco_id', $endereco_id);
+        $stmt->bindParam(':total', $total);
+        $stmt->bindParam(':observacoes', $observacoes);
+        $stmt->execute();
+        $pedido_id = $conn->lastInsertId();
+
+        // Inserir itens do pedido
+        $stmt_item = $conn->prepare("
+            INSERT INTO Pedido_Item (
+                id_pedido, id_produto, quantidade, 
+                preco_unitario, subtotal
+            ) VALUES (
+                :pedido_id, :produto_id, :quantidade, 
+                :preco_unitario, :subtotal
+            )
+        ");
+
+        foreach ($_SESSION['carrinho'] as $item) {
+            $stmt_item->bindValue(':pedido_id', $pedido_id);
+            $stmt_item->bindValue(':produto_id', $item['id_produto']);
+            $stmt_item->bindValue(':quantidade', $item['quantidade']);
+            $stmt_item->bindValue(':preco_unitario', $item['preco']);
+            $subtotal = $item['preco'] * $item['quantidade'];
+            $stmt_item->bindValue(':subtotal', $subtotal);
+            $stmt_item->execute();
+        }
+
+        // Inserir pagamento
+        $stmt_pagamento = $conn->prepare("
+            INSERT INTO Pagamento (
+                id_pedido, metodo, status, valor_pago
+            ) VALUES (
+                :pedido_id, :metodo, 'pendente', :valor
+            )
+        ");
+        $stmt_pagamento->bindParam(':pedido_id', $pedido_id);
+        $stmt_pagamento->bindParam(':metodo', $metodo_pagamento);
+        $stmt_pagamento->bindParam(':valor', $total);
+        $stmt_pagamento->execute();
+
+        $conn->commit();
+
+        // Limpar carrinho
+        unset($_SESSION['carrinho']);
+
+        flashMessage('Pedido realizado com sucesso! Número do pedido: #' . $pedido_id, 'success');
+        redirectTo('meus-pedidos.php');
+    } catch (Exception $e) {
+        $conn->rollBack();
+        flashMessage('Erro ao finalizar pedido: ' . $e->getMessage(), 'error');
+    }
+}
+
 // Processar remoção de item
 if (isset($_GET['remover']) && is_numeric($_GET['remover'])) {
     $idRemover = (int)$_GET['remover'];
@@ -28,9 +125,32 @@ if (isset($_GET['remover']) && is_numeric($_GET['remover'])) {
     redirectTo('carrinho.php');
 }
 
+// Buscar endereços do usuário
+try {
+    $database = new Database();
+    $conn = $database->getConnection();
+
+    $stmt = $conn->prepare("
+        SELECT id_endereco, rua, numero, complemento, bairro, cidade, estado, cep 
+        FROM Endereco 
+        WHERE id_usuario = :usuario_id
+    ");
+    $stmt->bindParam(':usuario_id', $_SESSION['usuario_id']);
+    $stmt->execute();
+    $enderecos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    flashMessage('Erro ao carregar endereços: ' . $e->getMessage(), 'error');
+    $enderecos = [];
+}
+
 // Calcular total do carrinho
 $total = 0;
 $carrinho = $_SESSION['carrinho'] ?? [];
+
+foreach ($carrinho as $item) {
+    $subtotal = $item['preco'] * $item['quantidade'];
+    $total += $subtotal;
+}
 
 require_once '../includes/header.php';
 ?>
@@ -55,6 +175,10 @@ require_once '../includes/header.php';
     .empty-cart-icon {
         font-size: 5rem;
         color: #dee2e6;
+    }
+    
+    .entrega-info {
+        display: none;
     }
     
     @media (max-width: 768px) {
@@ -108,7 +232,6 @@ require_once '../includes/header.php';
                                 <?php foreach ($carrinho as $item): ?>
                                     <?php 
                                         $subtotal = $item['preco'] * $item['quantidade'];
-                                        $total += $subtotal;
                                     ?>
                                     <tr>
                                         <td>
@@ -158,6 +281,76 @@ require_once '../includes/header.php';
                             </tbody>
                         </table>
                     </div>
+
+                    <div class="mt-4">
+                        <h5>Detalhes do Pedido</h5>
+                        <form method="POST" id="finalizar-form">
+                            <input type="hidden" name="finalizar_pedido" value="1">
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Forma de Entrega</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" 
+                                           name="forma_entrega" id="retirada" 
+                                           value="retirada" required checked>
+                                    <label class="form-check-label" for="retirada">
+                                        Retirada no Local
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" 
+                                           name="forma_entrega" id="delivery" 
+                                           value="delivery" required>
+                                    <label class="form-check-label" for="delivery">
+                                        Entrega em Domicílio
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div id="endereco-section" class="entrega-info mb-3">
+                                <label class="form-label">Selecione o Endereço</label>
+                                <?php if (empty($enderecos)): ?>
+                                    <div class="alert alert-warning">
+                                        Você não possui endereços cadastrados. 
+                                        <a href="../perfil.php?adicionar_endereco=1" target="_blank">
+                                            Adicionar Endereço
+                                        </a>
+                                    </div>
+                                <?php else: ?>
+                                    <select name="endereco_id" class="form-select">
+                                        <?php foreach ($enderecos as $endereco): ?>
+                                            <option value="<?php echo $endereco['id_endereco']; ?>">
+                                                <?php echo htmlspecialchars(
+                                                    sprintf("%s, %s - %s, %s - %s", 
+                                                        $endereco['rua'], 
+                                                        $endereco['numero'], 
+                                                        $endereco['bairro'], 
+                                                        $endereco['cidade'], 
+                                                        $endereco['estado']
+                                                    )
+                                                ); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Método de Pagamento</label>
+                                <select name="metodo_pagamento" class="form-select" required>
+                                    <option value="pix">PIX</option>
+                                    <option value="cartao">Cartão</option>
+                                    <option value="dinheiro">Dinheiro</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="observacoes" class="form-label">Observações</label>
+                                <textarea name="observacoes" class="form-control" rows="3" 
+                                          placeholder="Alguma observação sobre o pedido?"></textarea>
+                            </div>
+                        </form>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>
@@ -176,18 +369,18 @@ require_once '../includes/header.php';
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span>Taxa de entrega</span>
-                        <span>Grátis</span>
+                        <span id="taxa-entrega">Grátis</span>
                     </div>
                     <hr>
                     <div class="d-flex justify-content-between mb-3">
                         <span class="fw-bold">Total</span>
-                        <span class="fw-bold text-success fs-4"><?php echo formatCurrency($total); ?></span>
+                        <span class="fw-bold text-success fs-4" id="valor-total"><?php echo formatCurrency($total); ?></span>
                     </div>
                     
                     <div class="d-grid gap-2">
-                        <a href="finalizar-pedido.php" class="btn btn-primary">
+                        <button type="submit" form="finalizar-form" class="btn btn-primary">
                             <i class="bi bi-check2-circle"></i> Finalizar Pedido
-                        </a>
+                        </button>
                         <a href="cardapio.php" class="btn btn-outline-secondary">
                             <i class="bi bi-arrow-left"></i> Continuar Comprando
                         </a>
@@ -205,5 +398,28 @@ require_once '../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const retiradaRadio = document.getElementById('retirada');
+        const deliveryRadio = document.getElementById('delivery');
+        const enderecoSection = document.getElementById('endereco-section');
+
+        function toggleEnderecoSection() {
+            if (deliveryRadio.checked) {
+                enderecoSection.style.display = 'block';
+                // Se implementar taxa de entrega, atualizar aqui
+            } else {
+                enderecoSection.style.display = 'none';
+            }
+        }
+
+        retiradaRadio.addEventListener('change', toggleEnderecoSection);
+        deliveryRadio.addEventListener('change', toggleEnderecoSection);
+
+        // Estado inicial
+        toggleEnderecoSection();
+    });
+</script>
 
 <?php require_once '../includes/footer.php'; ?>
