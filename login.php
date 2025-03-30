@@ -108,8 +108,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                     </form>
                 </div>
-                <div class="card-footer text-center">
-                    <p class="mb-0">Novo por aqui? <a href="cadastro.php">Cadastre-se</a></p>
+                <div class="card-footer text-center mt-3">
+                    <p>
+                        <a href="cadastro.php">Cadastre-se</a> | 
+                        <a href="esqueci-senha.php">Esqueci minha senha</a>
+                    </p>
                 </div>
             </div>
         </div>

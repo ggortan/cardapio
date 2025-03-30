@@ -188,11 +188,22 @@ try {
                                             <td><?php echo date('d/m/Y', strtotime($usuario['data_criacao'])); ?></td>
                                             <td><?php echo $usuario['total_pedidos']; ?></td>
                                             <td>
-                                                <a href="usuarios.php?alternar_status=<?php echo $usuario['id_usuario']; ?>" 
-                                                   class="btn btn-sm <?php echo $usuario['status'] == 'ativo' ? 'btn-warning' : 'btn-success'; ?>"
-                                                   <?php echo $usuario['id_usuario'] == $_SESSION['usuario_id'] ? 'disabled' : ''; ?>>
-                                                    <?php echo $usuario['status'] == 'ativo' ? '<i class="bi bi-x-circle"></i> Desativar' : '<i class="bi bi-check-circle"></i> Ativar'; ?>
-                                                </a>
+                                                <div class="btn-group">
+                                                    <a href="usuarios.php?alternar_status=<?php echo $usuario['id_usuario']; ?>" 
+                                                    class="btn btn-sm <?php echo $usuario['status'] == 'ativo' ? 'btn-warning' : 'btn-success'; ?>"
+                                                    <?php echo $usuario['id_usuario'] == $_SESSION['usuario_id'] ? 'disabled' : ''; ?>>
+                                                        <?php echo $usuario['status'] == 'ativo' ? '<i class="bi bi-x-circle"></i> Desativar' : '<i class="bi bi-check-circle"></i> Ativar'; ?>
+                                                    </a>
+                                                    
+                                                    <!-- Adicione este link para redefinir senha -->
+                                                    <a href="redefinir-senha.php?id=<?php echo $usuario['id_usuario']; ?>" 
+                                                    class="btn btn-sm btn-outline-primary"
+                                                    <?php echo $usuario['id_usuario'] == $_SESSION['usuario_id'] ? 'disabled' : ''; ?>
+                                                    title="Redefinir senha">
+                                                        <i class="bi bi-key"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
