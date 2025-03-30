@@ -1,21 +1,5 @@
-# Arquivo .htaccess para assets/uploads/produtos/.htaccess
-
-# Desabilitar listagem de diretório
+# Arquivo .htaccess mais permissivo para o diretório de uploads
 Options -Indexes
-
-# Impedir execução de scripts PHP
-<FilesMatch "\.(?i:php|phtml|php\d+|inc|htaccess)$">
-    Order Allow,Deny
-    Deny from all
-</FilesMatch>
-
-# Permitir apenas tipos de imagem específicos
-<FilesMatch "\.(?i:jpe?g|png|gif|webp)$">
-    Order Allow,Deny
-    Allow from all
-</FilesMatch>
-
-# Definir headers de segurança
-<IfModule mod_headers.c>
-    Header set X-Content-Type-Options "nosniff"
+<IfModule mod_php.c>
+   php_flag engine off
 </IfModule>
