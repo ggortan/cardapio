@@ -31,98 +31,179 @@ if (isset($_GET['remover']) && is_numeric($_GET['remover'])) {
 // Calcular total do carrinho
 $total = 0;
 $carrinho = $_SESSION['carrinho'] ?? [];
+
+require_once '../includes/header.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>Carrinho de Compras</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container mt-4">
-        <h1>Seu Carrinho</h1>
-        
-        <?php displayFlashMessage(); ?>
+<style>
+    .cart-item-img {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+        border-radius: 5px;
+    }
+    
+    .cart-summary {
+        position: sticky;
+        top: 85px;
+    }
+    
+    .quantity-input {
+        width: 70px;
+    }
+    
+    .empty-cart-icon {
+        font-size: 5rem;
+        color: #dee2e6;
+    }
+    
+    @media (max-width: 768px) {
+        .cart-item-img {
+            width: 60px;
+            height: 60px;
+        }
+    }
+</style>
 
-        <?php if (empty($carrinho)): ?>
-            <div class="alert alert-info">
-                Seu carrinho está vazio. <a href="cardapio.php">Veja nosso cardápio</a>
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-cart"></i> Meu Carrinho 
+                    <?php if (!empty($carrinho)): ?>
+                        <span class="badge bg-primary rounded-pill"><?php echo count($carrinho); ?></span>
+                    <?php endif; ?>
+                </h5>
+                <a href="cardapio.php" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-arrow-left"></i> Continuar Comprando
+                </a>
             </div>
-        <?php else: ?>
-            <div class="card">
-                <div class="card-body">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Produto</th>
-                                <th>Preço Unitário</th>
-                                <th>Quantidade</th>
-                                <th>Subtotal</th>
-                                <th>Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($carrinho as $item): ?>
+            
+            <div class="card-body">
+                <?php displayFlashMessage(); ?>
+                
+                <?php if (empty($carrinho)): ?>
+                    <div class="text-center py-5">
+                        <i class="bi bi-cart-x empty-cart-icon"></i>
+                        <h4 class="mt-3">Seu carrinho está vazio</h4>
+                        <p class="text-muted">Adicione itens do nosso cardápio para começar seu pedido</p>
+                        <a href="cardapio.php" class="btn btn-primary mt-3">
+                            <i class="bi bi-arrow-left"></i> Ver Cardápio
+                        </a>
+                    </div>
+                <?php else: ?>
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($item['nome']); ?></td>
-                                    <td><?php echo formatCurrency($item['preco']); ?></td>
-                                    <td>
-                                        <form action="atualizar-carrinho.php" method="POST" class="d-inline">
-                                            <input type="hidden" name="id_produto" value="<?php echo $item['id_produto']; ?>">
-                                            <div class="input-group input-group-sm" style="width: 130px;">
-                                                <input type="number" name="quantidade" 
-                                                       class="form-control" 
-                                                       value="<?php echo $item['quantidade']; ?>" 
-                                                       min="1" max="10">
-                                                <button type="submit" class="btn btn-outline-secondary">
-                                                    <i class="bi bi-arrow-repeat"></i>
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </td>
-                                    <td>
-                                        <?php 
+                                    <th>Produto</th>
+                                    <th>Preço</th>
+                                    <th>Quantidade</th>
+                                    <th>Subtotal</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($carrinho as $item): ?>
+                                    <?php 
                                         $subtotal = $item['preco'] * $item['quantidade'];
                                         $total += $subtotal;
-                                        echo formatCurrency($subtotal); 
-                                        ?>
-                                    </td>
-                                    <td>
-                                        <a href="carrinho.php?remover=<?php echo $item['id_produto']; ?>" 
-                                           class="btn btn-danger btn-sm" 
-                                           onclick="return confirm('Remover este item?');">
-                                            <i class="bi bi-trash"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                        <tfoot>
-                            <tr class="table-active">
-                                <td colspan="3" class="text-end fw-bold">Total:</td>
-                                <td colspan="2" class="fw-bold text-success">
-                                    <?php echo formatCurrency($total); ?>
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
-
-                    <div class="d-flex justify-content-between">
-                        <a href="cardapio.php" class="btn btn-outline-secondary">
-                            Continuar Comprando
-                        </a>
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <?php if (!empty($item['imagem_url'] ?? '')): ?>
+                                                    <img src="<?php echo htmlspecialchars($item['imagem_url']); ?>" 
+                                                         class="cart-item-img me-3" 
+                                                         alt="<?php echo htmlspecialchars($item['nome']); ?>">
+                                                <?php else: ?>
+                                                    <div class="cart-item-img me-3 bg-light d-flex align-items-center justify-content-center">
+                                                        <i class="bi bi-image text-muted"></i>
+                                                    </div>
+                                                <?php endif; ?>
+                                                <div>
+                                                    <h6 class="mb-0"><?php echo htmlspecialchars($item['nome']); ?></h6>
+                                                    <small class="text-muted">Código: #<?php echo $item['id_produto']; ?></small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><?php echo formatCurrency($item['preco']); ?></td>
+                                        <td>
+                                            <form action="atualizar-carrinho.php" method="POST" class="d-inline">
+                                                <input type="hidden" name="id_produto" value="<?php echo $item['id_produto']; ?>">
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" name="quantidade" 
+                                                           class="form-control quantity-input" 
+                                                           value="<?php echo $item['quantidade']; ?>" 
+                                                           min="1" max="10">
+                                                    <button type="submit" class="btn btn-outline-secondary">
+                                                        <i class="bi bi-arrow-repeat"></i>
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </td>
+                                        <td>
+                                            <span class="fw-bold"><?php echo formatCurrency($subtotal); ?></span>
+                                        </td>
+                                        <td>
+                                            <a href="carrinho.php?remover=<?php echo $item['id_produto']; ?>" 
+                                               class="btn btn-sm btn-outline-danger" 
+                                               onclick="return confirm('Tem certeza que deseja remover este item?')">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <?php if (!empty($carrinho)): ?>
+            <div class="card shadow-sm cart-summary">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Resumo do Pedido</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal</span>
+                        <span><?php echo formatCurrency($total); ?></span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Taxa de entrega</span>
+                        <span>Grátis</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="fw-bold">Total</span>
+                        <span class="fw-bold text-success fs-4"><?php echo formatCurrency($total); ?></span>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
                         <a href="finalizar-pedido.php" class="btn btn-primary">
-                            Finalizar Pedido
+                            <i class="bi bi-check2-circle"></i> Finalizar Pedido
                         </a>
+                        <a href="cardapio.php" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Continuar Comprando
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <div class="small text-muted">
+                        <i class="bi bi-shield-check"></i> Pagamento seguro
+                    </div>
+                    <div class="small text-muted mt-1">
+                        <i class="bi bi-truck"></i> Entrega rápida e segura
                     </div>
                 </div>
             </div>
         <?php endif; ?>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-</body>
-</html>
+<?php require_once '../includes/footer.php'; ?>
