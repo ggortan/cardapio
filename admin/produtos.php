@@ -10,9 +10,12 @@ checkUserPermission('administrador');
 $database = new Database();
 $conn = $database->getConnection();
 
+// Definir caminho correto para upload de imagens (na raiz do projeto, não na pasta admin)
+$upload_directory = '../assets/uploads/produtos/';
+
 // Adicionar função de upload se não existir
 if (!function_exists('uploadImage')) {
-    function uploadImage($file, $directory = 'assets/uploads/produtos', $oldImage = null) {
+    function uploadImage($file, $directory, $oldImage = null) {
         // Verificar se o arquivo foi enviado corretamente
         if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
             $errorMessages = [
@@ -55,9 +58,17 @@ if (!function_exists('uploadImage')) {
             if (!mkdir($directory, 0755, true)) {
                 return [
                     'status' => false, 
-                    'message' => 'Não foi possível criar o diretório de destino.'
+                    'message' => 'Não foi possível criar o diretório de destino: ' . $directory
                 ];
             }
+        }
+        
+        // Verificar se o diretório tem permissão de escrita
+        if (!is_writable($directory)) {
+            return [
+                'status' => false, 
+                'message' => 'O diretório de destino não tem permissão de escrita: ' . $directory
+            ];
         }
         
         // Gerar nome único para o arquivo
@@ -65,17 +76,26 @@ if (!function_exists('uploadImage')) {
         $filename = uniqid('produto_') . '.' . $extension;
         $destination = $directory . '/' . $filename;
         
+        // Remover imagem antiga, se especificado e se ela existir
+        if ($oldImage && file_exists($oldImage) && is_file($oldImage)) {
+            @unlink($oldImage);
+        }
+        
         // Mover o arquivo para o destino
         if (!move_uploaded_file($file['tmp_name'], $destination)) {
             return [
                 'status' => false, 
-                'message' => 'Erro ao mover o arquivo para o destino final.'
+                'message' => 'Erro ao mover o arquivo para o destino final: ' . $destination
             ];
         }
         
+        // Retornar o caminho relativo para uso no HTML (não o caminho absoluto)
+        $web_path = str_replace('../', '', $destination);
+        
         return [
             'status' => true, 
-            'path' => $destination
+            'path' => $web_path,
+            'full_path' => $destination
         ];
     }
 }
@@ -94,6 +114,21 @@ if (isset($_GET['excluir']) && is_numeric($_GET['excluir'])) {
     $id_produto = (int)$_GET['excluir'];
     
     try {
+        // Primeiro, verificar se o produto tem uma imagem local para excluir
+        $stmt = $conn->prepare("SELECT imagem_url FROM Produto WHERE id_produto = :id");
+        $stmt->bindParam(':id', $id_produto);
+        $stmt->execute();
+        $imagemUrl = $stmt->fetchColumn();
+        
+        // Se for uma imagem local (upload), excluí-la
+        if ($imagemUrl && strpos($imagemUrl, 'assets/uploads/') === 0) {
+            $fullPath = '../' . $imagemUrl; // Caminho completo no sistema de arquivos
+            if (file_exists($fullPath) && is_file($fullPath)) {
+                @unlink($fullPath);
+            }
+        }
+        
+        // Excluir o produto
         $stmt = $conn->prepare("DELETE FROM Produto WHERE id_produto = :id");
         $stmt->bindParam(':id', $id_produto);
         $stmt->execute();
@@ -126,8 +161,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $isImageUploaded = isset($_FILES['imagem_upload']) && $_FILES['imagem_upload']['size'] > 0;
     
     if ($isImageUploaded) {
+        // Se estiver editando, buscar a imagem atual para possível exclusão
+        $imagem_atual = '';
+        if ($id_produto) {
+            $stmt = $conn->prepare("SELECT imagem_url FROM Produto WHERE id_produto = :id");
+            $stmt->bindParam(':id', $id_produto);
+            $stmt->execute();
+            $db_imagem_url = $stmt->fetchColumn();
+            
+            // Se for uma imagem local, construir caminho completo para exclusão
+            if ($db_imagem_url && strpos($db_imagem_url, 'assets/uploads/') === 0) {
+                $imagem_atual = '../' . $db_imagem_url;
+            }
+        }
+        
         // Realizar upload da nova imagem
-        $upload_result = uploadImage($_FILES['imagem_upload'], 'assets/uploads/produtos');
+        $upload_result = uploadImage($_FILES['imagem_upload'], $upload_directory, $imagem_atual);
         
         if (!$upload_result['status']) {
             $errors[] = $upload_result['message'];
@@ -136,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     if (empty($errors)) {
         try {
-            // Se foi feito upload de imagem, usar o caminho retornado
+            // Se foi feito upload de imagem, usar o caminho retornado (web path)
             if ($isImageUploaded && $upload_result['status']) {
                 $imagem_url = $upload_result['path'];
             }
@@ -261,9 +310,9 @@ require_once '../includes/header.php';
                             <td><?php echo $produto_item['id_produto']; ?></td>
                             <td>
                                 <?php if (!empty($produto_item['imagem_url'])): ?>
-                                    <img src="<?php echo htmlspecialchars($produto_item['imagem_url']); ?>" 
+                                    <img src="<?php echo '../' . htmlspecialchars($produto_item['imagem_url']); ?>" 
                                          alt="<?php echo htmlspecialchars($produto_item['nome']); ?>" 
-                                         class="img-thumbnail" style="max-width: 50px;">
+                                         class="img-thumbnail" style="max-width: 50px; max-height: 50px;">
                                 <?php else: ?>
                                     <span class="text-muted">Sem imagem</span>
                                 <?php endif; ?>
@@ -356,7 +405,7 @@ require_once '../includes/header.php';
                             <!-- Prévia da imagem atual -->
                             <?php if ($produto && !empty($produto['imagem_url'])): ?>
                                 <div class="col-md-3 mb-3">
-                                    <img src="<?php echo htmlspecialchars($produto['imagem_url']); ?>" 
+                                    <img src="<?php echo '../' . htmlspecialchars($produto['imagem_url']); ?>" 
                                          alt="<?php echo htmlspecialchars($produto['nome']); ?>" 
                                          class="img-thumbnail" style="max-height: 100px;">
                                 </div>
