@@ -59,6 +59,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['cart_items'])) {
             }
         }
         
+        // Adicionar script para limpar localStorage também
+        echo "<script>
+            if (typeof localStorage !== 'undefined') {
+                // Não removemos aqui, pois queremos manter até que o pedido seja finalizado
+                console.log('Carrinho sincronizado com sucesso!');
+            }
+        </script>";
+        
         flashMessage('Carrinho sincronizado com sucesso!', 'success');
     } catch (Exception $e) {
         flashMessage('Erro ao sincronizar carrinho: ' . $e->getMessage(), 'error');

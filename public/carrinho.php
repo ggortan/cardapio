@@ -96,8 +96,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['finalizar_pedido'])) {
 
         $conn->commit();
 
-        // Limpar carrinho
-        unset($_SESSION['carrinho']);
+        // Limpar carrinho - aqui resetamos completamente o carrinho
+        if (isset($_SESSION['carrinho'])) {
+            unset($_SESSION['carrinho']);
+        }
+        
+        // Limpar também qualquer versão do carrinho que possa estar no localStorage
+        echo "<script>
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem('dynamicCart');
+            }
+        </script>";
 
         flashMessage('Pedido realizado com sucesso! Número do pedido: #' . $pedido_id, 'success');
         redirectTo('meus-pedidos.php');

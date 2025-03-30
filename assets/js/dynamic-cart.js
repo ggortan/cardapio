@@ -455,3 +455,40 @@ function formatCurrency(value) {
 document.addEventListener('DOMContentLoaded', function() {
     DynamicCart.init();
 });
+/**
+ * Função para limpar completamente o carrinho após finalização do pedido
+ * Esta deve ser chamada após a conclusão bem-sucedida de um pedido
+ */
+function resetCartAfterOrder() {
+    // Verificar se o objeto DynamicCart existe
+    if (typeof DynamicCart !== 'undefined') {
+        // Limpar o carrinho
+        DynamicCart.clearCart();
+    }
+    
+    // Limpar diretamente do localStorage como backup
+    if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('dynamicCart');
+    }
+    
+    console.log('Carrinho limpo com sucesso após finalização do pedido!');
+}
+
+// Adicionar evento para detectar sucesso na finalização do pedido
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificar se há uma mensagem de sucesso de pedido na página
+    const flashMessages = document.querySelectorAll('.alert-success');
+    let orderCompleted = false;
+    
+    // Verificar se alguma mensagem indica finalização de pedido
+    flashMessages.forEach(message => {
+        if (message.textContent.includes('Pedido realizado com sucesso')) {
+            orderCompleted = true;
+        }
+    });
+    
+    // Se o pedido foi concluído, limpar o carrinho
+    if (orderCompleted) {
+        resetCartAfterOrder();
+    }
+});

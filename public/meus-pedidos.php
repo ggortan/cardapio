@@ -201,4 +201,33 @@ require_once '../includes/header.php';
     });
 </script>
 
+<!-- Script para limpar o carrinho se o usuário acabou de finalizar um pedido -->
+<script>
+// Função para limpar completamente o carrinho após finalização do pedido
+function resetCartAfterOrder() {
+    // Limpar diretamente do localStorage como backup
+    if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('dynamicCart');
+    }
+    
+    console.log('Carrinho limpo com sucesso após finalização do pedido!');
+}
+
+// Verificar se há uma mensagem de sucesso de pedido na página
+const flashMessages = document.querySelectorAll('.alert-success');
+let orderCompleted = false;
+
+// Verificar se alguma mensagem indica finalização de pedido
+flashMessages.forEach(message => {
+    if (message.textContent.includes('Pedido realizado com sucesso')) {
+        orderCompleted = true;
+    }
+});
+
+// Se o pedido foi concluído, limpar o carrinho
+if (orderCompleted) {
+    resetCartAfterOrder();
+}
+</script>
+
 <?php require_once '../includes/footer.php'; ?>
