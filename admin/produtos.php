@@ -10,6 +10,76 @@ checkUserPermission('administrador');
 $database = new Database();
 $conn = $database->getConnection();
 
+// Adicionar função de upload se não existir
+if (!function_exists('uploadImage')) {
+    function uploadImage($file, $directory = 'assets/uploads/produtos', $oldImage = null) {
+        // Verificar se o arquivo foi enviado corretamente
+        if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
+            $errorMessages = [
+                UPLOAD_ERR_INI_SIZE => 'O arquivo excede o tamanho máximo permitido pelo servidor.',
+                UPLOAD_ERR_FORM_SIZE => 'O arquivo excede o tamanho máximo permitido pelo formulário.',
+                UPLOAD_ERR_PARTIAL => 'O upload do arquivo foi feito parcialmente.',
+                UPLOAD_ERR_NO_FILE => 'Nenhum arquivo foi enviado.',
+                UPLOAD_ERR_NO_TMP_DIR => 'Pasta temporária ausente no servidor.',
+                UPLOAD_ERR_CANT_WRITE => 'Falha ao escrever arquivo no disco.',
+                UPLOAD_ERR_EXTENSION => 'Uma extensão PHP interrompeu o upload do arquivo.'
+            ];
+            
+            $errorMessage = isset($errorMessages[$file['error']]) 
+                ? $errorMessages[$file['error']] 
+                : 'Erro desconhecido no upload.';
+                
+            return ['status' => false, 'message' => $errorMessage];
+        }
+        
+        // Verificar o tipo do arquivo
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!in_array($file['type'], $allowedTypes)) {
+            return [
+                'status' => false, 
+                'message' => 'Tipo de arquivo não permitido. Apenas imagens JPG, PNG, GIF e WEBP são aceitas.'
+            ];
+        }
+        
+        // Verificar o tamanho do arquivo (5MB máximo)
+        $maxSize = 5 * 1024 * 1024; // 5MB em bytes
+        if ($file['size'] > $maxSize) {
+            return [
+                'status' => false, 
+                'message' => 'O arquivo excede o tamanho máximo permitido de 5MB.'
+            ];
+        }
+        
+        // Criar diretório se não existir
+        if (!file_exists($directory)) {
+            if (!mkdir($directory, 0755, true)) {
+                return [
+                    'status' => false, 
+                    'message' => 'Não foi possível criar o diretório de destino.'
+                ];
+            }
+        }
+        
+        // Gerar nome único para o arquivo
+        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $filename = uniqid('produto_') . '.' . $extension;
+        $destination = $directory . '/' . $filename;
+        
+        // Mover o arquivo para o destino
+        if (!move_uploaded_file($file['tmp_name'], $destination)) {
+            return [
+                'status' => false, 
+                'message' => 'Erro ao mover o arquivo para o destino final.'
+            ];
+        }
+        
+        return [
+            'status' => true, 
+            'path' => $destination
+        ];
+    }
+}
+
 // Carregar categorias para o formulário
 try {
     $stmt = $conn->query("SELECT id_categoria, nome FROM Categoria ORDER BY nome");
@@ -24,18 +94,6 @@ if (isset($_GET['excluir']) && is_numeric($_GET['excluir'])) {
     $id_produto = (int)$_GET['excluir'];
     
     try {
-        // Primeiro, verificar se o produto tem uma imagem local para excluir
-        $stmt = $conn->prepare("SELECT imagem_url FROM Produto WHERE id_produto = :id");
-        $stmt->bindParam(':id', $id_produto);
-        $stmt->execute();
-        $imagemUrl = $stmt->fetchColumn();
-        
-        // Se for uma imagem local (upload), excluí-la
-        if ($imagemUrl && strpos($imagemUrl, 'assets/uploads/') === 0 && file_exists($imagemUrl)) {
-            unlink($imagemUrl);
-        }
-        
-        // Excluir o produto
         $stmt = $conn->prepare("DELETE FROM Produto WHERE id_produto = :id");
         $stmt->bindParam(':id', $id_produto);
         $stmt->execute();
@@ -68,17 +126,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $isImageUploaded = isset($_FILES['imagem_upload']) && $_FILES['imagem_upload']['size'] > 0;
     
     if ($isImageUploaded) {
-        // Se estiver editando, buscar a imagem atual
-        $imagem_atual = '';
-        if ($id_produto) {
-            $stmt = $conn->prepare("SELECT imagem_url FROM Produto WHERE id_produto = :id");
-            $stmt->bindParam(':id', $id_produto);
-            $stmt->execute();
-            $imagem_atual = $stmt->fetchColumn();
-        }
-        
         // Realizar upload da nova imagem
-        $upload_result = uploadImage($_FILES['imagem_upload'], 'assets/uploads/produtos', $imagem_atual);
+        $upload_result = uploadImage($_FILES['imagem_upload'], 'assets/uploads/produtos');
         
         if (!$upload_result['status']) {
             $errors[] = $upload_result['message'];
@@ -171,7 +220,7 @@ require_once '../includes/header.php';
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
     <h1 class="h2">Gerenciar Produtos</h1>
-    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#produtoModal">
+    <button type="button" class="btn btn-primary" id="btnNovoProduto">
         <i class="bi bi-plus-lg"></i> Novo Produto
     </button>
 </div>
@@ -224,7 +273,7 @@ require_once '../includes/header.php';
                             <td><?php echo formatCurrency($produto_item['preco']); ?></td>
                             <td>
                                 <a href="produtos.php?editar=<?php echo $produto_item['id_produto']; ?>" 
-                                   class="btn btn-sm btn-primary">
+                                   class="btn btn-sm btn-primary btn-editar">
                                     <i class="bi bi-pencil-square"></i>
                                 </a>
                                 <a href="produtos.php?excluir=<?php echo $produto_item['id_produto']; ?>" 
@@ -257,7 +306,7 @@ require_once '../includes/header.php';
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form method="POST" action="produtos.php" enctype="multipart/form-data">
+                <form method="POST" action="produtos.php" enctype="multipart/form-data" id="formProduto">
                     <?php if ($produto): ?>
                         <input type="hidden" name="id_produto" value="<?php echo $produto['id_produto']; ?>">
                     <?php endif; ?>
@@ -376,28 +425,67 @@ require_once '../includes/header.php';
 </div>
 
 <script>
-    // Script para prévia da imagem selecionada
     document.addEventListener('DOMContentLoaded', function() {
+        // Inicializar o modal
+        let produtoModal = new bootstrap.Modal(document.getElementById('produtoModal'));
+        
+        // Mostrar o modal ao clicar no botão Novo Produto
+        document.getElementById('btnNovoProduto').addEventListener('click', function() {
+            // Limpar o formulário
+            document.getElementById('formProduto').reset();
+            
+            // Se há campos hidden para id_produto, remover ou limpar
+            const idField = document.querySelector('input[name="id_produto"]');
+            if (idField) idField.remove();
+            
+            // Atualizar o título do modal
+            document.getElementById('produtoModalLabel').textContent = 'Novo Produto';
+            
+            // Abrir o modal
+            produtoModal.show();
+        });
+        
+        // Abrir modal para edição quando clicar no botão editar
+        document.querySelectorAll('.btn-editar').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Redirecionar para a URL com o parâmetro editar
+                window.location.href = this.getAttribute('href');
+            });
+        });
+        
+        // Se estiver no modo de edição (produto está definido), abrir o modal
+        <?php if ($produto): ?>
+        produtoModal.show();
+        <?php endif; ?>
+        
+        // Configurar o comportamento dos tabs da imagem
+        const uploadTab = document.getElementById('upload-tab');
+        const urlTab = document.getElementById('url-tab');
         const uploadInput = document.getElementById('imagem_upload');
         const urlInput = document.getElementById('imagem_url');
         
-        // Toggle entre tabs para limpar a outra opção
-        document.getElementById('upload-tab').addEventListener('click', function() {
-            if (urlInput) urlInput.value = '';
-        });
+        if (uploadTab && urlTab) {
+            // Limpar URL ao selecionar a tab de upload
+            uploadTab.addEventListener('click', function() {
+                if (urlInput) urlInput.value = '';
+            });
+            
+            // Limpar upload ao selecionar a tab de URL
+            urlTab.addEventListener('click', function() {
+                if (uploadInput) uploadInput.value = '';
+            });
+        }
         
-        document.getElementById('url-tab').addEventListener('click', function() {
-            if (uploadInput) uploadInput.value = '';
-        });
-        
-        // Mostrar prévia da imagem selecionada no upload
+        // Mostrar prévia da imagem selecionada
         if (uploadInput) {
             uploadInput.addEventListener('change', function() {
                 const file = this.files[0];
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = function(e) {
-                        // Se já existe uma prévia, atualiza; senão, cria
+                        // Procurar por uma prévia existente ou criar uma nova
                         let preview = document.querySelector('.preview-image');
                         if (!preview) {
                             preview = document.createElement('img');
