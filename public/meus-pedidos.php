@@ -180,27 +180,6 @@ require_once '../includes/header.php';
     </div>
 <?php endif; ?>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const toggleButtons = document.querySelectorAll('.toggle-details');
-        
-        toggleButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                const pedidoId = this.getAttribute('data-pedido');
-                const detalhesDiv = document.getElementById('itens-' + pedidoId);
-                
-                if (detalhesDiv.classList.contains('detalhe-hidden')) {
-                    detalhesDiv.classList.remove('detalhe-hidden');
-                    this.innerHTML = '<i class="bi bi-x-lg"></i> Ocultar Itens';
-                } else {
-                    detalhesDiv.classList.add('detalhe-hidden');
-                    this.innerHTML = '<i class="bi bi-list-ul"></i> Ver Itens';
-                }
-            });
-        });
-    });
-</script>
-
 <!-- Script para limpar o carrinho se o usuário acabou de finalizar um pedido -->
 <script>
 // Função para limpar completamente o carrinho após finalização do pedido
@@ -241,6 +220,24 @@ document.addEventListener('DOMContentLoaded', function() {
     if (orderCompleted || document.referrer.includes('carrinho.php')) {
         resetCartAfterOrder();
     }
+
+    // Configurar os botões de toggle para os detalhes do pedido
+    const toggleButtons = document.querySelectorAll('.toggle-details');
+    
+    toggleButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const pedidoId = this.getAttribute('data-pedido');
+            const detalhesDiv = document.getElementById('itens-' + pedidoId);
+            
+            if (detalhesDiv.classList.contains('detalhe-hidden')) {
+                detalhesDiv.classList.remove('detalhe-hidden');
+                this.innerHTML = '<i class="bi bi-x-lg"></i> Ocultar Itens';
+            } else {
+                detalhesDiv.classList.add('detalhe-hidden');
+                this.innerHTML = '<i class="bi bi-list-ul"></i> Ver Itens';
+            }
+        });
+    });
 });
 
 // Limpar o carrinho imediatamente (para garantir)

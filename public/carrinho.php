@@ -10,6 +10,53 @@ if (!isLoggedIn()) {
     redirectTo('../login.php');
 }
 
+// Verificar se recebemos dados do localStorage via POST
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['localStorage_cart'])) {
+    try {
+        $localStorage_items = json_decode($_POST['localStorage_cart'], true);
+        
+        if (json_last_error() === JSON_ERROR_NONE && is_array($localStorage_items)) {
+            // Se a sessão não tiver carrinho ou estiver vazia, usar os dados do localStorage
+            if (!isset($_SESSION['carrinho']) || empty($_SESSION['carrinho'])) {
+                // Validar e adicionar itens ao carrinho da sessão
+                $_SESSION['carrinho'] = [];
+                
+                $database = new Database();
+                $conn = $database->getConnection();
+                
+                foreach ($localStorage_items as $item) {
+                    if (!isset($item['id_produto'])) continue;
+                    
+                    // Verificar se o produto existe
+                    $stmt = $conn->prepare("SELECT id_produto, nome, preco FROM Produto WHERE id_produto = :id");
+                    $stmt->bindParam(':id', $item['id_produto']);
+                    $stmt->execute();
+                    $produto = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($produto) {
+                        // Verificar se quantidade é válida
+                        $quantidade = max(1, min(10, (int)($item['quantidade'] ?? 1)));
+                        
+                        // Adicionar ao carrinho
+                        $_SESSION['carrinho'][] = [
+                            'id_produto' => $produto['id_produto'],
+                            'nome' => $produto['nome'],
+                            'preco' => $produto['preco'],
+                            'quantidade' => $quantidade,
+                            'imagem_url' => $item['imagem_url'] ?? null
+                        ];
+                    }
+                }
+            }
+        }
+    } catch (Exception $e) {
+        error_log('Erro ao processar carrinho do localStorage: ' . $e->getMessage());
+    }
+}
+
+// Verificar se precisamos carregar dados do localStorage (quando a página carrega)
+$checkLocalStorage = !isset($_SESSION['carrinho']) || empty($_SESSION['carrinho']);
+
 // Processar finalização do pedido
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['finalizar_pedido'])) {
     $forma_entrega = filter_input(INPUT_POST, 'forma_entrega', FILTER_SANITIZE_STRING);
@@ -156,6 +203,42 @@ foreach ($carrinho as $item) {
 
 require_once '../includes/header.php';
 ?>
+
+<?php if ($checkLocalStorage): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificar se temos itens no localStorage
+    try {
+        if (typeof localStorage !== 'undefined') {
+            const savedCart = localStorage.getItem('dynamicCart');
+            if (savedCart) {
+                const cartData = JSON.parse(savedCart);
+                if (cartData && cartData.items && cartData.items.length > 0) {
+                    // Criar um formulário oculto para enviar os dados do localStorage para o servidor
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = window.location.href; // Mesmo URL
+                    form.style.display = 'none';
+
+                    // Adicionar os dados do localStorage como um campo oculto
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'localStorage_cart';
+                    input.value = JSON.stringify(cartData.items);
+                    form.appendChild(input);
+
+                    // Adicionar o formulário à página e enviar
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Erro ao sincronizar carrinho:', e);
+    }
+});
+</script>
+<?php endif; ?>
 
 <style>
     .cart-item-img {
@@ -401,27 +484,58 @@ require_once '../includes/header.php';
     </div>
 </div>
 
+<?php
+// Substitua o bloco de script original no final de cardapio.php,
+// logo antes do require_once '../includes/footer.php';
+?>
+
+<!-- Script do carrinho dinâmico -->
 <script>
+    // Variável para o token CSRF
+    const csrfToken = '<?php echo $csrf_token; ?>';
+</script>
+<script src="../assets/js/dynamic-cart.js"></script>
+<script>
+    // Adicionando este script para corrigir o botão de finalizar pedido
     document.addEventListener('DOMContentLoaded', function() {
-        const retiradaRadio = document.getElementById('retirada');
-        const deliveryRadio = document.getElementById('delivery');
-        const enderecoSection = document.getElementById('endereco-section');
-
-        function toggleEnderecoSection() {
-            if (deliveryRadio.checked) {
-                enderecoSection.style.display = 'block';
-                // Se implementar taxa de entrega, atualizar aqui
-            } else {
-                enderecoSection.style.display = 'none';
-            }
+        // Seleciona o botão dentro do modal
+        const syncCartBtn = document.getElementById('sync-cart-btn');
+        
+        if (syncCartBtn) {
+            // Substitui o evento original
+            const newSyncBtn = syncCartBtn.cloneNode(true);
+            syncCartBtn.parentNode.replaceChild(newSyncBtn, syncCartBtn);
+            
+            // Adiciona novo evento
+            newSyncBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Verifica se o carrinho tem itens
+                if (typeof DynamicCart !== 'undefined' && DynamicCart.items.length > 0) {
+                    // Cria um form para enviar os dados para o servidor
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = 'sincronizar-carrinho.php';
+                    form.style.display = 'none';
+                    
+                    // Adiciona os itens do carrinho ao form
+                    const cartInput = document.createElement('input');
+                    cartInput.type = 'hidden';
+                    cartInput.name = 'cart_items';
+                    cartInput.value = JSON.stringify(DynamicCart.items);
+                    form.appendChild(cartInput);
+                    
+                    // Adiciona o form à página e submete
+                    document.body.appendChild(form);
+                    form.submit();
+                } else {
+                    alert('Seu carrinho está vazio. Adicione produtos antes de finalizar o pedido.');
+                }
+            });
         }
-
-        retiradaRadio.addEventListener('change', toggleEnderecoSection);
-        deliveryRadio.addEventListener('change', toggleEnderecoSection);
-
-        // Estado inicial
-        toggleEnderecoSection();
     });
 </script>
+
+<?php require_once '../includes/footer.php'; ?>
 
 <?php require_once '../includes/footer.php'; ?>

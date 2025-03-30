@@ -418,6 +418,9 @@ const DynamicCart = {
             return;
         }
         
+        // Salvar no localStorage para garantir persistência entre páginas
+        this.saveCart();
+        
         // Criar formulário para envio
         const form = document.createElement('form');
         form.method = 'POST';
@@ -454,65 +457,4 @@ function formatCurrency(value) {
 // Inicializar quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', function() {
     DynamicCart.init();
-});
-
-/**
- * Modifica o comportamento de syncCart no DynamicCart.js para direcionar para a página de carrinho
- * em vez de sincronizar-carrinho.php, pois agora queremos ir direto para a página de checkout completa
- */
-if (typeof DynamicCart !== 'undefined') {
-    // Sobrescrever a função syncCart original
-    DynamicCart.syncCart = function() {
-        if (this.items.length === 0) {
-            alert('Seu carrinho está vazio.');
-            return;
-        }
-        
-        // Salvar items no localStorage para garantir persistência
-        localStorage.setItem('dynamicCart', JSON.stringify({
-            items: this.items,
-            updated: new Date().toISOString()
-        }));
-        
-        // Redirecionar para o carrinho em vez de criar um form
-        window.location.href = 'carrinho.php';
-    };
-}
-
-/**
- * Função para limpar completamente o carrinho após finalização do pedido
- * Esta deve ser chamada após a conclusão bem-sucedida de um pedido
- */
-function resetCartAfterOrder() {
-    // Verificar se o objeto DynamicCart existe
-    if (typeof DynamicCart !== 'undefined') {
-        // Limpar o carrinho
-        DynamicCart.clearCart();
-    }
-    
-    // Limpar diretamente do localStorage como backup
-    if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem('dynamicCart');
-    }
-    
-    console.log('Carrinho limpo com sucesso após finalização do pedido!');
-}
-
-// Adicionar evento para detectar sucesso na finalização do pedido
-document.addEventListener('DOMContentLoaded', function() {
-    // Verificar se há uma mensagem de sucesso de pedido na página
-    const flashMessages = document.querySelectorAll('.alert-success');
-    let orderCompleted = false;
-    
-    // Verificar se alguma mensagem indica finalização de pedido
-    flashMessages.forEach(message => {
-        if (message.textContent.includes('Pedido realizado com sucesso')) {
-            orderCompleted = true;
-        }
-    });
-    
-    // Se o pedido foi concluído, limpar o carrinho
-    if (orderCompleted) {
-        resetCartAfterOrder();
-    }
 });

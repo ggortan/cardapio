@@ -1,14 +1,27 @@
 <?php
-// public/sincronizar-carrinho.php 
+// public/sincronizar-carrinho.php - versão corrigida
 session_start();
 require_once '../config/database.php';
 require_once '../includes/functions.php';
 
+// Definir cabeçalho de resposta como JSON se for uma requisição AJAX
+if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+    header('Content-Type: application/json');
+}
+
 // Verificar se usuário está logado
 if (!isLoggedIn()) {
-    // Redirecionar para login com retorno para o carrinho
-    flashMessage('Você precisa fazer login para acessar o carrinho', 'error');
-    redirectTo('../login.php?retorno=carrinho.php');
+    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Você precisa fazer login para acessar o carrinho',
+            'redirect' => '../login.php'
+        ]);
+        exit;
+    } else {
+        flashMessage('Você precisa fazer login para acessar o carrinho', 'error');
+        redirectTo('../login.php');
+    }
 }
 
 // Processar itens do carrinho enviados
@@ -20,29 +33,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['cart_items'])) {
             throw new Exception("Erro ao processar dados do carrinho");
         }
         
-        if (!is_array($cart_items)) {
-            throw new Exception("Formato de carrinho inválido");
+        if (!is_array($cart_items) || empty($cart_items)) {
+            throw new Exception("Dados do carrinho inválidos ou vazios");
         }
         
-        // Inicializar carrinho
+        // Inicializar carrinho na sessão
         $_SESSION['carrinho'] = [];
-        
-        // Verificar se não está vazio
-        if (empty($cart_items)) {
-            flashMessage('Seu carrinho está vazio', 'info');
-            redirectTo('carrinho.php');
-        }
         
         // Validar e adicionar itens ao carrinho da sessão
         $database = new Database();
         $conn = $database->getConnection();
         
         foreach ($cart_items as $item) {
-            // Verificar se o produto existe e se o id_produto está definido
-            if (!isset($item['id_produto'])) {
-                continue; // Pular itens inválidos
-            }
+            // Ignorar itens sem id_produto
+            if (!isset($item['id_produto'])) continue;
             
+            // Verificar se o produto existe
             $stmt = $conn->prepare("SELECT id_produto, nome, preco FROM Produto WHERE id_produto = :id");
             $stmt->bindParam(':id', $item['id_produto']);
             $stmt->execute();
@@ -64,10 +70,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['cart_items'])) {
         }
         
         flashMessage('Carrinho sincronizado com sucesso!', 'success');
+        
+        // Se for Ajax, retornar sucesso
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Carrinho sincronizado com sucesso!',
+                'item_count' => count($_SESSION['carrinho'])
+            ]);
+            exit;
+        }
     } catch (Exception $e) {
-        flashMessage('Erro ao sincronizar carrinho: ' . $e->getMessage(), 'error');
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Erro ao sincronizar carrinho: ' . $e->getMessage()
+            ]);
+            exit;
+        } else {
+            flashMessage('Erro ao sincronizar carrinho: ' . $e->getMessage(), 'error');
+        }
     }
 }
 
-// Sempre redirecionar para o carrinho no final
+// Redirecionar para o carrinho (para requisições não-Ajax)
 redirectTo('carrinho.php');
