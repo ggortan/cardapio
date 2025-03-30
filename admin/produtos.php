@@ -24,6 +24,18 @@ if (isset($_GET['excluir']) && is_numeric($_GET['excluir'])) {
     $id_produto = (int)$_GET['excluir'];
     
     try {
+        // Primeiro, verificar se o produto tem uma imagem local para excluir
+        $stmt = $conn->prepare("SELECT imagem_url FROM Produto WHERE id_produto = :id");
+        $stmt->bindParam(':id', $id_produto);
+        $stmt->execute();
+        $imagemUrl = $stmt->fetchColumn();
+        
+        // Se for uma imagem local (upload), excluí-la
+        if ($imagemUrl && strpos($imagemUrl, 'assets/uploads/') === 0 && file_exists($imagemUrl)) {
+            unlink($imagemUrl);
+        }
+        
+        // Excluir o produto
         $stmt = $conn->prepare("DELETE FROM Produto WHERE id_produto = :id");
         $stmt->bindParam(':id', $id_produto);
         $stmt->execute();
@@ -43,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $descricao = sanitizeInput($_POST['descricao']);
     $preco = filter_input(INPUT_POST, 'preco', FILTER_VALIDATE_FLOAT);
     $id_categoria = filter_input(INPUT_POST, 'id_categoria', FILTER_VALIDATE_INT);
-    $imagem_url = sanitizeInput($_POST['imagem_url']);
+    $imagem_url = sanitizeInput($_POST['imagem_url'] ?? '');
     
     // Validações básicas
     $errors = [];
@@ -51,8 +63,35 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($preco === false || $preco <= 0) $errors[] = "Preço deve ser um número positivo";
     if ($id_categoria === false) $errors[] = "Categoria válida é obrigatória";
     
+    // Verificar upload de imagem
+    $upload_result = ['status' => false];
+    $isImageUploaded = isset($_FILES['imagem_upload']) && $_FILES['imagem_upload']['size'] > 0;
+    
+    if ($isImageUploaded) {
+        // Se estiver editando, buscar a imagem atual
+        $imagem_atual = '';
+        if ($id_produto) {
+            $stmt = $conn->prepare("SELECT imagem_url FROM Produto WHERE id_produto = :id");
+            $stmt->bindParam(':id', $id_produto);
+            $stmt->execute();
+            $imagem_atual = $stmt->fetchColumn();
+        }
+        
+        // Realizar upload da nova imagem
+        $upload_result = uploadImage($_FILES['imagem_upload'], 'assets/uploads/produtos', $imagem_atual);
+        
+        if (!$upload_result['status']) {
+            $errors[] = $upload_result['message'];
+        }
+    }
+    
     if (empty($errors)) {
         try {
+            // Se foi feito upload de imagem, usar o caminho retornado
+            if ($isImageUploaded && $upload_result['status']) {
+                $imagem_url = $upload_result['path'];
+            }
+            
             // Se tem ID, atualiza, senão insere
             if ($id_produto) {
                 $stmt = $conn->prepare("
@@ -126,214 +165,253 @@ try {
     flashMessage('Erro ao listar produtos: ' . $e->getMessage(), 'error');
     $produtos = [];
 }
+
+require_once '../includes/header.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <title>Gerenciar Produtos - Administração</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link" href="dashboard.php">
-                                <i class="bi bi-speedometer2"></i> Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="pedidos.php">
-                                <i class="bi bi-list-check"></i> Pedidos
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link active" href="produtos.php">
-                                <i class="bi bi-box"></i> Produtos
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="categorias.php">
-                                <i class="bi bi-tag"></i> Categorias
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="usuarios.php">
-                                <i class="bi bi-people"></i> Usuários
-                            </a>
-                        </li>
-                        <li class="nav-item mt-5">
-                            <a class="nav-link text-danger" href="../logout.php">
-                                <i class="bi bi-box-arrow-right"></i> Sair
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Gerenciar Produtos</h1>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#produtoModal">
+        <i class="bi bi-plus-lg"></i> Novo Produto
+    </button>
+</div>
 
-            <!-- Main content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Gerenciar Produtos</h1>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#produtoModal">
-                        <i class="bi bi-plus-lg"></i> Novo Produto
-                    </button>
-                </div>
+<?php displayFlashMessage(); ?>
 
-                <?php displayFlashMessage(); ?>
-                
-                <?php if (!empty($errors)): ?>
-                    <div class="alert alert-danger">
-                        <ul class="mb-0">
-                            <?php foreach ($errors as $error): ?>
-                                <li><?php echo $error; ?></li>
-                            <?php endforeach; ?>
-                        </ul>
-                    </div>
-                <?php endif; ?>
+<?php if (!empty($errors)): ?>
+    <div class="alert alert-danger">
+        <ul class="mb-0">
+            <?php foreach ($errors as $error): ?>
+                <li><?php echo $error; ?></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+<?php endif; ?>
 
-                <!-- Produtos Table -->
-                <div class="card shadow mb-4">
-                    <div class="card-header py-3">
-                        <h6 class="m-0 font-weight-bold text-primary">Lista de Produtos</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Imagem</th>
-                                        <th>Nome</th>
-                                        <th>Categoria</th>
-                                        <th>Preço</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($produtos as $produto_item): ?>
-                                        <tr>
-                                            <td><?php echo $produto_item['id_produto']; ?></td>
-                                            <td>
-                                                <?php if (!empty($produto_item['imagem_url'])): ?>
-                                                    <img src="<?php echo htmlspecialchars($produto_item['imagem_url']); ?>" 
-                                                         alt="<?php echo htmlspecialchars($produto_item['nome']); ?>" 
-                                                         class="img-thumbnail" style="max-width: 50px;">
-                                                <?php else: ?>
-                                                    <span class="text-muted">Sem imagem</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?php echo htmlspecialchars($produto_item['nome']); ?></td>
-                                            <td><?php echo htmlspecialchars($produto_item['categoria_nome']); ?></td>
-                                            <td><?php echo formatCurrency($produto_item['preco']); ?></td>
-                                            <td>
-                                                <a href="produtos.php?editar=<?php echo $produto_item['id_produto']; ?>" 
-                                                   class="btn btn-sm btn-primary">
-                                                    <i class="bi bi-pencil-square"></i>
-                                                </a>
-                                                <a href="produtos.php?excluir=<?php echo $produto_item['id_produto']; ?>" 
-                                                   class="btn btn-sm btn-danger"
-                                                   onclick="return confirm('Tem certeza que deseja excluir este produto?');">
-                                                    <i class="bi bi-trash"></i>
-                                                </a>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                    <?php if (empty($produtos)): ?>
-                                        <tr>
-                                            <td colspan="6" class="text-center">Nenhum produto cadastrado</td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </main>
+<!-- Produtos Table -->
+<div class="card shadow mb-4">
+    <div class="card-header py-3">
+        <h6 class="m-0 font-weight-bold text-primary">Lista de Produtos</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Imagem</th>
+                        <th>Nome</th>
+                        <th>Categoria</th>
+                        <th>Preço</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($produtos as $produto_item): ?>
+                        <tr>
+                            <td><?php echo $produto_item['id_produto']; ?></td>
+                            <td>
+                                <?php if (!empty($produto_item['imagem_url'])): ?>
+                                    <img src="<?php echo htmlspecialchars($produto_item['imagem_url']); ?>" 
+                                         alt="<?php echo htmlspecialchars($produto_item['nome']); ?>" 
+                                         class="img-thumbnail" style="max-width: 50px;">
+                                <?php else: ?>
+                                    <span class="text-muted">Sem imagem</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?php echo htmlspecialchars($produto_item['nome']); ?></td>
+                            <td><?php echo htmlspecialchars($produto_item['categoria_nome']); ?></td>
+                            <td><?php echo formatCurrency($produto_item['preco']); ?></td>
+                            <td>
+                                <a href="produtos.php?editar=<?php echo $produto_item['id_produto']; ?>" 
+                                   class="btn btn-sm btn-primary">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                                <a href="produtos.php?excluir=<?php echo $produto_item['id_produto']; ?>" 
+                                   class="btn btn-sm btn-danger"
+                                   onclick="return confirm('Tem certeza que deseja excluir este produto?');">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    <?php if (empty($produtos)): ?>
+                        <tr>
+                            <td colspan="6" class="text-center">Nenhum produto cadastrado</td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
     </div>
+</div>
 
-    <!-- Modal de Produto -->
-    <div class="modal fade" id="produtoModal" tabindex="-1" aria-labelledby="produtoModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="produtoModalLabel">
-                        <?php echo $produto ? 'Editar Produto' : 'Novo Produto'; ?>
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form method="POST" action="produtos.php">
-                        <?php if ($produto): ?>
-                            <input type="hidden" name="id_produto" value="<?php echo $produto['id_produto']; ?>">
-                        <?php endif; ?>
-                        
-                        <div class="mb-3">
-                            <label for="nome" class="form-label">Nome do Produto</label>
-                            <input type="text" class="form-control" id="nome" name="nome" 
-                                   value="<?php echo $produto ? htmlspecialchars($produto['nome']) : ''; ?>" required>
+<!-- Modal de Produto -->
+<div class="modal fade" id="produtoModal" tabindex="-1" aria-labelledby="produtoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="produtoModalLabel">
+                    <?php echo $produto ? 'Editar Produto' : 'Novo Produto'; ?>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="produtos.php" enctype="multipart/form-data">
+                    <?php if ($produto): ?>
+                        <input type="hidden" name="id_produto" value="<?php echo $produto['id_produto']; ?>">
+                    <?php endif; ?>
+                    
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome do Produto</label>
+                        <input type="text" class="form-control" id="nome" name="nome" 
+                               value="<?php echo $produto ? htmlspecialchars($produto['nome']) : ''; ?>" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descricao" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="descricao" name="descricao" rows="3"><?php 
+                            echo $produto ? htmlspecialchars($produto['descricao']) : ''; 
+                        ?></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="preco" class="form-label">Preço</label>
+                            <div class="input-group">
+                                <span class="input-group-text">R$</span>
+                                <input type="number" class="form-control" id="preco" name="preco" 
+                                       step="0.01" min="0.01"
+                                       value="<?php echo $produto ? htmlspecialchars($produto['preco']) : ''; ?>" required>
+                            </div>
                         </div>
                         
-                        <div class="mb-3">
-                            <label for="descricao" class="form-label">Descrição</label>
-                            <textarea class="form-control" id="descricao" name="descricao" rows="3"><?php 
-                                echo $produto ? htmlspecialchars($produto['descricao']) : ''; 
-                            ?></textarea>
+                        <div class="col-md-6 mb-3">
+                            <label for="id_categoria" class="form-label">Categoria</label>
+                            <select class="form-select" id="id_categoria" name="id_categoria" required>
+                                <option value="">Selecione uma categoria</option>
+                                <?php foreach ($categorias as $categoria): ?>
+                                    <option value="<?php echo $categoria['id_categoria']; ?>"
+                                        <?php echo $produto && $produto['id_categoria'] == $categoria['id_categoria'] ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($categoria['nome']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Imagem do Produto</label>
                         
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="preco" class="form-label">Preço</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">R$</span>
-                                    <input type="number" class="form-control" id="preco" name="preco" 
-                                           step="0.01" min="0.01"
-                                           value="<?php echo $produto ? htmlspecialchars($produto['preco']) : ''; ?>" required>
+                        <div class="row align-items-center">
+                            <!-- Prévia da imagem atual -->
+                            <?php if ($produto && !empty($produto['imagem_url'])): ?>
+                                <div class="col-md-3 mb-3">
+                                    <img src="<?php echo htmlspecialchars($produto['imagem_url']); ?>" 
+                                         alt="<?php echo htmlspecialchars($produto['nome']); ?>" 
+                                         class="img-thumbnail" style="max-height: 100px;">
+                                </div>
+                            <?php endif; ?>
+                            
+                            <!-- Opções de imagem -->
+                            <div class="col-md-<?php echo ($produto && !empty($produto['imagem_url'])) ? '9' : '12'; ?>">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                                            <li class="nav-item" role="presentation">
+                                                <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" 
+                                                        data-bs-target="#upload-pane" type="button" role="tab" 
+                                                        aria-controls="upload-pane" aria-selected="true">
+                                                    Upload de Arquivo
+                                                </button>
+                                            </li>
+                                            <li class="nav-item" role="presentation">
+                                                <button class="nav-link" id="url-tab" data-bs-toggle="tab" 
+                                                        data-bs-target="#url-pane" type="button" role="tab" 
+                                                        aria-controls="url-pane" aria-selected="false">
+                                                    URL Externa
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="tab-content">
+                                            <!-- Tab Upload -->
+                                            <div class="tab-pane fade show active" id="upload-pane" role="tabpanel" aria-labelledby="upload-tab">
+                                                <div class="mb-3">
+                                                    <label for="imagem_upload" class="form-label">Selecione uma imagem</label>
+                                                    <input type="file" class="form-control" id="imagem_upload" name="imagem_upload" 
+                                                           accept="image/jpeg, image/png, image/gif, image/webp">
+                                                    <div id="uploadHelp" class="form-text">
+                                                        Formatos suportados: JPG, PNG, GIF, WEBP. Tamanho máximo: 5MB
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Tab URL -->
+                                            <div class="tab-pane fade" id="url-pane" role="tabpanel" aria-labelledby="url-tab">
+                                                <div class="mb-3">
+                                                    <label for="imagem_url" class="form-label">URL da Imagem</label>
+                                                    <input type="url" class="form-control" id="imagem_url" name="imagem_url" 
+                                                           placeholder="https://exemplo.com/imagem.jpg"
+                                                           value="<?php echo $produto ? htmlspecialchars($produto['imagem_url']) : ''; ?>">
+                                                    <div class="form-text">Insira a URL completa da imagem (incluindo https://)</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="id_categoria" class="form-label">Categoria</label>
-                                <select class="form-select" id="id_categoria" name="id_categoria" required>
-                                    <option value="">Selecione uma categoria</option>
-                                    <?php foreach ($categorias as $categoria): ?>
-                                        <option value="<?php echo $categoria['id_categoria']; ?>"
-                                            <?php echo $produto && $produto['id_categoria'] == $categoria['id_categoria'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($categoria['nome']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
                         </div>
-                        
-                        <div class="mb-3">
-                            <label for="imagem_url" class="form-label">URL da Imagem</label>
-                            <input type="text" class="form-control" id="imagem_url" name="imagem_url" 
-                                   value="<?php echo $produto ? htmlspecialchars($produto['imagem_url']) : ''; ?>">
-                            <div class="form-text">Deixe em branco para não exibir imagem</div>
-                        </div>
-                        
+                    </div>
+                    
+                    <div class="mt-4">
                         <button type="submit" class="btn btn-primary">Salvar</button>
-                    </form>
-                </div>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <?php if ($produto): ?>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            new bootstrap.Modal(document.getElementById('produtoModal')).show();
+<script>
+    // Script para prévia da imagem selecionada
+    document.addEventListener('DOMContentLoaded', function() {
+        const uploadInput = document.getElementById('imagem_upload');
+        const urlInput = document.getElementById('imagem_url');
+        
+        // Toggle entre tabs para limpar a outra opção
+        document.getElementById('upload-tab').addEventListener('click', function() {
+            if (urlInput) urlInput.value = '';
         });
-    </script>
-    <?php endif; ?>
-</body>
-</html>
+        
+        document.getElementById('url-tab').addEventListener('click', function() {
+            if (uploadInput) uploadInput.value = '';
+        });
+        
+        // Mostrar prévia da imagem selecionada no upload
+        if (uploadInput) {
+            uploadInput.addEventListener('change', function() {
+                const file = this.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        // Se já existe uma prévia, atualiza; senão, cria
+                        let preview = document.querySelector('.preview-image');
+                        if (!preview) {
+                            preview = document.createElement('img');
+                            preview.className = 'preview-image img-thumbnail mt-2';
+                            preview.style.maxHeight = '150px';
+                            uploadInput.parentNode.appendChild(preview);
+                        }
+                        preview.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+    });
+</script>
+
+<?php require_once '../includes/footer.php'; ?>
