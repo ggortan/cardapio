@@ -10,103 +10,58 @@ checkUserPermission('administrador');
 $database = new Database();
 $conn = $database->getConnection();
 
-// Definir caminho correto para upload de imagens (na raiz do projeto, não na pasta admin)
-$upload_directory = '../assets/uploads/produtos/';
+// Definir caminhos importantes para upload e acesso às imagens
+$root_path = $_SERVER['DOCUMENT_ROOT'] . '/eep/cardapio/';  // Caminho absoluto para a raiz do projeto
+$uploads_dir = 'assets/uploads/produtos';  // Diretório relativo para uploads (como armazenado no BD)
+$physical_uploads_dir = $root_path . $uploads_dir;  // Caminho físico completo para a pasta de uploads
 
-// Adicionar função de upload se não existir
-if (!function_exists('uploadImage')) {
-    function uploadImage($file, $directory, $oldImage = null) {
-        // Verificar se o arquivo foi enviado corretamente
-        if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
-            $errorMessages = [
-                UPLOAD_ERR_INI_SIZE => 'O arquivo excede o tamanho máximo permitido pelo servidor.',
-                UPLOAD_ERR_FORM_SIZE => 'O arquivo excede o tamanho máximo permitido pelo formulário.',
-                UPLOAD_ERR_PARTIAL => 'O upload do arquivo foi feito parcialmente.',
-                UPLOAD_ERR_NO_FILE => 'Nenhum arquivo foi enviado.',
-                UPLOAD_ERR_NO_TMP_DIR => 'Pasta temporária ausente no servidor.',
-                UPLOAD_ERR_CANT_WRITE => 'Falha ao escrever arquivo no disco.',
-                UPLOAD_ERR_EXTENSION => 'Uma extensão PHP interrompeu o upload do arquivo.'
-            ];
-            
-            $errorMessage = isset($errorMessages[$file['error']]) 
-                ? $errorMessages[$file['error']] 
-                : 'Erro desconhecido no upload.';
-                
-            return ['status' => false, 'message' => $errorMessage];
-        }
-        
-        // Verificar o tipo do arquivo
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!in_array($file['type'], $allowedTypes)) {
-            return [
-                'status' => false, 
-                'message' => 'Tipo de arquivo não permitido. Apenas imagens JPG, PNG, GIF e WEBP são aceitas.'
-            ];
-        }
-        
-        // Verificar o tamanho do arquivo (5MB máximo)
-        $maxSize = 5 * 1024 * 1024; // 5MB em bytes
-        if ($file['size'] > $maxSize) {
-            return [
-                'status' => false, 
-                'message' => 'O arquivo excede o tamanho máximo permitido de 5MB.'
-            ];
-        }
-        
-        // Criar diretório se não existir
-        if (!file_exists($directory)) {
-            if (!mkdir($directory, 0755, true)) {
-                return [
-                    'status' => false, 
-                    'message' => 'Não foi possível criar o diretório de destino: ' . $directory
-                ];
-            }
-        }
-        
-        // Verificar se o diretório tem permissão de escrita
-        if (!is_writable($directory)) {
-            return [
-                'status' => false, 
-                'message' => 'O diretório de destino não tem permissão de escrita: ' . $directory
-            ];
-        }
-        
-        // Gerar nome único para o arquivo
-        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-        $filename = uniqid('produto_') . '.' . $extension;
-        $destination = $directory . '/' . $filename;
-        
-        // Remover imagem antiga, se especificado e se ela existir
-        if ($oldImage && file_exists($oldImage) && is_file($oldImage)) {
-            @unlink($oldImage);
-        }
-        
-        // Mover o arquivo para o destino
-        if (!move_uploaded_file($file['tmp_name'], $destination)) {
-            return [
-                'status' => false, 
-                'message' => 'Erro ao mover o arquivo para o destino final: ' . $destination
-            ];
-        }
-        
-        // Retornar o caminho relativo para uso no HTML (não o caminho absoluto)
-        $web_path = str_replace('../', '', $destination);
-        
-        return [
-            'status' => true, 
-            'path' => $web_path,
-            'full_path' => $destination
-        ];
-    }
+// Criar o diretório de uploads se não existir
+if (!file_exists($physical_uploads_dir)) {
+    mkdir($physical_uploads_dir, 0755, true);
 }
 
-// Carregar categorias para o formulário
-try {
-    $stmt = $conn->query("SELECT id_categoria, nome FROM Categoria ORDER BY nome");
-    $categorias = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {
-    flashMessage('Erro ao carregar categorias: ' . $e->getMessage(), 'error');
-    $categorias = [];
+// Função para manipular uploads de imagem
+function handleImageUpload($file, $physical_dir, $db_path, $old_image = null) {
+    // Verificar erros no upload
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        return ['status' => false, 'message' => 'Erro no upload: código ' . $file['error']];
+    }
+    
+    // Verificar tipo de arquivo
+    $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!in_array($file['type'], $allowed_types)) {
+        return ['status' => false, 'message' => 'Tipo de arquivo não permitido. Use apenas JPG, PNG, GIF ou WEBP.'];
+    }
+    
+    // Verificar tamanho (5MB máximo)
+    if ($file['size'] > 5 * 1024 * 1024) {
+        return ['status' => false, 'message' => 'O arquivo excede o tamanho máximo de 5MB.'];
+    }
+    
+    // Gerar nome único para o arquivo
+    $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+    $filename = uniqid('produto_') . '.' . $extension;
+    $full_path = $physical_dir . '/' . $filename;
+    
+    // Remover imagem antiga se existir
+    if ($old_image && file_exists($old_image) && is_file($old_image)) {
+        @unlink($old_image);
+    }
+    
+    // Mover o arquivo para o destino
+    if (!move_uploaded_file($file['tmp_name'], $full_path)) {
+        return [
+            'status' => false, 
+            'message' => 'Falha ao salvar o arquivo. Verifique as permissões do diretório.'
+        ];
+    }
+    
+    // Retornar o caminho para o banco de dados (relativo) e o caminho físico
+    return [
+        'status' => true,
+        'db_path' => $db_path . '/' . $filename,  // Caminho para armazenar no BD
+        'full_path' => $full_path                 // Caminho físico no sistema
+    ];
 }
 
 // Processar exclusão de produto
@@ -114,21 +69,21 @@ if (isset($_GET['excluir']) && is_numeric($_GET['excluir'])) {
     $id_produto = (int)$_GET['excluir'];
     
     try {
-        // Primeiro, verificar se o produto tem uma imagem local para excluir
+        // Verificar se o produto tem imagem para excluir
         $stmt = $conn->prepare("SELECT imagem_url FROM Produto WHERE id_produto = :id");
         $stmt->bindParam(':id', $id_produto);
         $stmt->execute();
-        $imagemUrl = $stmt->fetchColumn();
+        $imagem_url = $stmt->fetchColumn();
         
-        // Se for uma imagem local (upload), excluí-la
-        if ($imagemUrl && strpos($imagemUrl, 'assets/uploads/') === 0) {
-            $fullPath = '../' . $imagemUrl; // Caminho completo no sistema de arquivos
-            if (file_exists($fullPath) && is_file($fullPath)) {
-                @unlink($fullPath);
+        // Se houver imagem e ela estiver no diretório de uploads, excluir
+        if ($imagem_url && strpos($imagem_url, 'assets/uploads/') === 0) {
+            $full_image_path = $root_path . $imagem_url;
+            if (file_exists($full_image_path)) {
+                @unlink($full_image_path);
             }
         }
         
-        // Excluir o produto
+        // Excluir o produto do banco de dados
         $stmt = $conn->prepare("DELETE FROM Produto WHERE id_produto = :id");
         $stmt->bindParam(':id', $id_produto);
         $stmt->execute();
@@ -161,22 +116,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $isImageUploaded = isset($_FILES['imagem_upload']) && $_FILES['imagem_upload']['size'] > 0;
     
     if ($isImageUploaded) {
-        // Se estiver editando, buscar a imagem atual para possível exclusão
-        $imagem_atual = '';
+        // Se editando, buscar imagem atual para possível exclusão
+        $old_image_path = null;
         if ($id_produto) {
             $stmt = $conn->prepare("SELECT imagem_url FROM Produto WHERE id_produto = :id");
             $stmt->bindParam(':id', $id_produto);
             $stmt->execute();
-            $db_imagem_url = $stmt->fetchColumn();
+            $current_image = $stmt->fetchColumn();
             
-            // Se for uma imagem local, construir caminho completo para exclusão
-            if ($db_imagem_url && strpos($db_imagem_url, 'assets/uploads/') === 0) {
-                $imagem_atual = '../' . $db_imagem_url;
+            if ($current_image && strpos($current_image, 'assets/uploads/') === 0) {
+                $old_image_path = $root_path . $current_image;
             }
         }
         
-        // Realizar upload da nova imagem
-        $upload_result = uploadImage($_FILES['imagem_upload'], $upload_directory, $imagem_atual);
+        // Processar upload
+        $upload_result = handleImageUpload(
+            $_FILES['imagem_upload'],
+            $physical_uploads_dir,
+            $uploads_dir,
+            $old_image_path
+        );
         
         if (!$upload_result['status']) {
             $errors[] = $upload_result['message'];
@@ -185,12 +144,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     if (empty($errors)) {
         try {
-            // Se foi feito upload de imagem, usar o caminho retornado (web path)
+            // Se fez upload de imagem, usar o caminho retornado
             if ($isImageUploaded && $upload_result['status']) {
-                $imagem_url = $upload_result['path'];
+                $imagem_url = $upload_result['db_path'];
             }
             
-            // Se tem ID, atualiza, senão insere
+            // Preparar query (atualizar ou inserir)
             if ($id_produto) {
                 $stmt = $conn->prepare("
                     UPDATE Produto SET 
@@ -226,6 +185,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } catch (Exception $e) {
             flashMessage('Erro ao salvar produto: ' . $e->getMessage(), 'error');
         }
+    } else {
+        // Se houver erros, exibi-los
+        foreach ($errors as $error) {
+            flashMessage($error, 'error');
+        }
     }
 }
 
@@ -249,6 +213,15 @@ if (isset($_GET['editar']) && is_numeric($_GET['editar'])) {
     }
 }
 
+// Carregar categorias para o formulário
+try {
+    $stmt = $conn->query("SELECT id_categoria, nome FROM Categoria ORDER BY nome");
+    $categorias = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    flashMessage('Erro ao carregar categorias: ' . $e->getMessage(), 'error');
+    $categorias = [];
+}
+
 // Listar todos os produtos
 try {
     $stmt = $conn->prepare("
@@ -264,6 +237,20 @@ try {
     $produtos = [];
 }
 
+// Função para gerar URL para imagens (útil para gerar URLs corretas)
+function getImageUrl($relativePath) {
+    // Caminho base da aplicação
+    $base = '/eep/cardapio/';
+    
+    // Se for URL externa (começando com http ou https), retorna como está
+    if (preg_match('/^https?:\/\//', $relativePath)) {
+        return $relativePath;
+    }
+    
+    // Senão, constrói URL a partir do caminho relativo
+    return $base . $relativePath;
+}
+
 require_once '../includes/header.php';
 ?>
 
@@ -275,16 +262,6 @@ require_once '../includes/header.php';
 </div>
 
 <?php displayFlashMessage(); ?>
-
-<?php if (!empty($errors)): ?>
-    <div class="alert alert-danger">
-        <ul class="mb-0">
-            <?php foreach ($errors as $error): ?>
-                <li><?php echo $error; ?></li>
-            <?php endforeach; ?>
-        </ul>
-    </div>
-<?php endif; ?>
 
 <!-- Produtos Table -->
 <div class="card shadow mb-4">
@@ -310,7 +287,7 @@ require_once '../includes/header.php';
                             <td><?php echo $produto_item['id_produto']; ?></td>
                             <td>
                                 <?php if (!empty($produto_item['imagem_url'])): ?>
-                                    <img src="<?php echo '../' . htmlspecialchars($produto_item['imagem_url']); ?>" 
+                                    <img src="<?php echo getImageUrl($produto_item['imagem_url']); ?>" 
                                          alt="<?php echo htmlspecialchars($produto_item['nome']); ?>" 
                                          class="img-thumbnail" style="max-width: 50px; max-height: 50px;">
                                 <?php else: ?>
@@ -405,7 +382,7 @@ require_once '../includes/header.php';
                             <!-- Prévia da imagem atual -->
                             <?php if ($produto && !empty($produto['imagem_url'])): ?>
                                 <div class="col-md-3 mb-3">
-                                    <img src="<?php echo '../' . htmlspecialchars($produto['imagem_url']); ?>" 
+                                    <img src="<?php echo getImageUrl($produto['imagem_url']); ?>" 
                                          alt="<?php echo htmlspecialchars($produto['nome']); ?>" 
                                          class="img-thumbnail" style="max-height: 100px;">
                                 </div>
