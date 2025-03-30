@@ -455,6 +455,30 @@ function formatCurrency(value) {
 document.addEventListener('DOMContentLoaded', function() {
     DynamicCart.init();
 });
+
+/**
+ * Modifica o comportamento de syncCart no DynamicCart.js para direcionar para a página de carrinho
+ * em vez de sincronizar-carrinho.php, pois agora queremos ir direto para a página de checkout completa
+ */
+if (typeof DynamicCart !== 'undefined') {
+    // Sobrescrever a função syncCart original
+    DynamicCart.syncCart = function() {
+        if (this.items.length === 0) {
+            alert('Seu carrinho está vazio.');
+            return;
+        }
+        
+        // Salvar items no localStorage para garantir persistência
+        localStorage.setItem('dynamicCart', JSON.stringify({
+            items: this.items,
+            updated: new Date().toISOString()
+        }));
+        
+        // Redirecionar para o carrinho em vez de criar um form
+        window.location.href = 'carrinho.php';
+    };
+}
+
 /**
  * Função para limpar completamente o carrinho após finalização do pedido
  * Esta deve ser chamada após a conclusão bem-sucedida de um pedido

@@ -205,29 +205,46 @@ require_once '../includes/header.php';
 <script>
 // Função para limpar completamente o carrinho após finalização do pedido
 function resetCartAfterOrder() {
-    // Limpar diretamente do localStorage como backup
-    if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem('dynamicCart');
+    try {
+        // Limpar diretamente o localStorage
+        if (typeof localStorage !== 'undefined') {
+            localStorage.removeItem('dynamicCart');
+        }
+        
+        // Limpar variáveis globais se existirem
+        if (typeof DynamicCart !== 'undefined') {
+            DynamicCart.items = [];
+            DynamicCart.count = 0;
+            DynamicCart.updateCartIcon();
+        }
+        
+        console.log('Carrinho limpo com sucesso após finalização do pedido!');
+    } catch (e) {
+        console.error('Erro ao limpar carrinho:', e);
     }
-    
-    console.log('Carrinho limpo com sucesso após finalização do pedido!');
 }
 
-// Verificar se há uma mensagem de sucesso de pedido na página
-const flashMessages = document.querySelectorAll('.alert-success');
-let orderCompleted = false;
-
-// Verificar se alguma mensagem indica finalização de pedido
-flashMessages.forEach(message => {
-    if (message.textContent.includes('Pedido realizado com sucesso')) {
-        orderCompleted = true;
+// Executar imediatamente para garantir que o localStorage seja limpo
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificar se há uma mensagem de sucesso de pedido na página
+    const flashMessages = document.querySelectorAll('.alert-success');
+    let orderCompleted = false;
+    
+    // Verificar se alguma mensagem indica finalização de pedido
+    flashMessages.forEach(message => {
+        if (message.textContent.includes('Pedido realizado com sucesso')) {
+            orderCompleted = true;
+        }
+    });
+    
+    // Se o pedido foi concluído ou se chegamos a esta página após um redirecionamento do carrinho
+    if (orderCompleted || document.referrer.includes('carrinho.php')) {
+        resetCartAfterOrder();
     }
 });
 
-// Se o pedido foi concluído, limpar o carrinho
-if (orderCompleted) {
-    resetCartAfterOrder();
-}
+// Limpar o carrinho imediatamente (para garantir)
+resetCartAfterOrder();
 </script>
 
 <?php require_once '../includes/footer.php'; ?>

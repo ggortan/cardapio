@@ -380,6 +380,37 @@ require_once '../includes/header.php';
             });
         }
     });
+    // Adicionando este script no final da página de cardápio para corrigir o botão de finalizar pedido
+document.addEventListener('DOMContentLoaded', function() {
+    // Seleciona o botão dentro do modal
+    const syncCartBtn = document.getElementById('sync-cart-btn');
+    
+    if (syncCartBtn) {
+        // Substitui o evento original
+        syncCartBtn.addEventListener('click', function(e) {
+            e.preventDefault(); // Previne qualquer comportamento padrão
+            e.stopPropagation(); // Impede propagação do evento
+            
+            // Verifica se o carrinho tem itens para evitar redirecionamento desnecessário
+            if (typeof DynamicCart !== 'undefined' && DynamicCart.items.length > 0) {
+                // Salva o carrinho no localStorage antes de redirecionar
+                try {
+                    localStorage.setItem('dynamicCart', JSON.stringify({
+                        items: DynamicCart.items,
+                        updated: new Date().toISOString()
+                    }));
+                } catch (e) {
+                    console.error('Erro ao salvar carrinho:', e);
+                }
+                
+                // Redireciona para a página de carrinho
+                window.location.href = 'carrinho.php';
+            } else {
+                alert('Seu carrinho está vazio. Adicione produtos antes de finalizar o pedido.');
+            }
+        });
+    }
+});
 </script>
 
 <?php require_once '../includes/footer.php'; ?>

@@ -1,5 +1,5 @@
 <?php
-// public/sincronizar-carrinho.php
+// public/sincronizar-carrinho.php 
 session_start();
 require_once '../config/database.php';
 require_once '../includes/functions.php';
@@ -38,7 +38,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['cart_items'])) {
         $conn = $database->getConnection();
         
         foreach ($cart_items as $item) {
-            // Verificar se o produto existe
+            // Verificar se o produto existe e se o id_produto está definido
+            if (!isset($item['id_produto'])) {
+                continue; // Pular itens inválidos
+            }
+            
             $stmt = $conn->prepare("SELECT id_produto, nome, preco FROM Produto WHERE id_produto = :id");
             $stmt->bindParam(':id', $item['id_produto']);
             $stmt->execute();
@@ -46,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['cart_items'])) {
             
             if ($produto) {
                 // Verificar se quantidade é válida
-                $quantidade = max(1, min(10, (int)$item['quantidade']));
+                $quantidade = max(1, min(10, (int)($item['quantidade'] ?? 1)));
                 
                 // Adicionar ao carrinho
                 $_SESSION['carrinho'][] = [
@@ -59,19 +63,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['cart_items'])) {
             }
         }
         
-        // Adicionar script para limpar localStorage também
-        echo "<script>
-            if (typeof localStorage !== 'undefined') {
-                // Não removemos aqui, pois queremos manter até que o pedido seja finalizado
-                console.log('Carrinho sincronizado com sucesso!');
-            }
-        </script>";
-        
         flashMessage('Carrinho sincronizado com sucesso!', 'success');
     } catch (Exception $e) {
         flashMessage('Erro ao sincronizar carrinho: ' . $e->getMessage(), 'error');
     }
 }
 
-// Redirecionar para o carrinho
+// Sempre redirecionar para o carrinho no final
 redirectTo('carrinho.php');
