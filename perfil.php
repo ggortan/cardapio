@@ -388,8 +388,11 @@ require_once 'includes/header.php';
                 e.target.value = value;
             });
         }
-        
-        // Verificar se o usuário veio do carrinho
+    });
+
+    // Verificar se o usuário veio do carrinho
+    document.addEventListener('DOMContentLoaded', function() {
+        // Verificar se há parâmetro de retorno na URL
         const urlParams = new URLSearchParams(window.location.search);
         const retorno = urlParams.get('retorno');
         
@@ -403,7 +406,9 @@ require_once 'includes/header.php';
             
             // Perguntar ao usuário se deseja retornar ao carrinho
             if (confirm('Endereço cadastrado com sucesso! Deseja retornar ao carrinho para finalizar seu pedido?')) {
-                window.location.href = 'public/carrinho.php';
+                // Corrigido para usar caminho relativo correto
+                // Assumindo que estamos na raiz do projeto e o carrinho está em /public/carrinho.php
+                window.location.href = './public/carrinho.php';
             }
         }
     });
