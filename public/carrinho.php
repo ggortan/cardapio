@@ -397,26 +397,33 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <?php if (empty($enderecos)): ?>
                                     <div class="alert alert-warning">
                                         Você não possui endereços cadastrados. 
-                                        <a href="../perfil.php?adicionar_endereco=1" target="_blank">
-                                            Adicionar Endereço
+                                        <a href="../perfil.php?adicionar_endereco=1&retorno=carrinho" class="btn btn-sm btn-primary">
+                                            <i class="bi bi-plus-lg"></i> Adicionar Endereço
                                         </a>
                                     </div>
                                 <?php else: ?>
-                                    <select name="endereco_id" class="form-select">
-                                        <?php foreach ($enderecos as $endereco): ?>
-                                            <option value="<?php echo $endereco['id_endereco']; ?>">
-                                                <?php echo htmlspecialchars(
-                                                    sprintf("%s, %s - %s, %s - %s", 
-                                                        $endereco['rua'], 
-                                                        $endereco['numero'], 
-                                                        $endereco['bairro'], 
-                                                        $endereco['cidade'], 
-                                                        $endereco['estado']
-                                                    )
-                                                ); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <div class="mb-3">
+                                        <select name="endereco_id" class="form-select">
+                                            <?php foreach ($enderecos as $endereco): ?>
+                                                <option value="<?php echo $endereco['id_endereco']; ?>">
+                                                    <?php echo htmlspecialchars(
+                                                        sprintf("%s, %s - %s, %s - %s", 
+                                                            $endereco['rua'], 
+                                                            $endereco['numero'], 
+                                                            $endereco['bairro'], 
+                                                            $endereco['cidade'], 
+                                                            $endereco['estado']
+                                                        )
+                                                    ); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="mt-2 mb-3 text-end">
+                                        <a href="../perfil.php?adicionar_endereco=1&retorno=carrinho" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-plus-lg"></i> Cadastrar Novo Endereço
+                                        </a>
+                                    </div>
                                 <?php endif; ?>
                             </div>
 
