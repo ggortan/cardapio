@@ -484,11 +484,6 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
-<?php
-// Substitua o bloco de script original no final de cardapio.php,
-// logo antes do require_once '../includes/footer.php';
-?>
-
 <!-- Script do carrinho dinâmico -->
 <script>
     // Variável para o token CSRF
@@ -533,6 +528,46 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+        
+        // NOVA FUNCIONALIDADE: Verificar endereços ao tentar finalizar
+        const retiradaRadio = document.getElementById('retirada');
+        const deliveryRadio = document.getElementById('delivery');
+        const enderecoSection = document.getElementById('endereco-section');
+        const finalizarForm = document.getElementById('finalizar-form');
+
+        function toggleEnderecoSection() {
+            enderecoSection.style.display = 
+                deliveryRadio.checked ? 'block' : 'none';
+        }
+
+        retiradaRadio.addEventListener('change', toggleEnderecoSection);
+        deliveryRadio.addEventListener('change', toggleEnderecoSection);
+
+        // Inicialização
+        toggleEnderecoSection();
+
+        // Verificar endereços ao tentar finalizar
+        finalizarForm.addEventListener('submit', function(e) {
+            if (deliveryRadio.checked) {
+                // Verificar se o usuário tem endereços cadastrados
+                const enderecoSelect = document.querySelector('select[name="endereco_id"]');
+                const semEnderecos = document.querySelector('.alert-warning');
+                
+                if (semEnderecos || !enderecoSelect || enderecoSelect.options.length === 0) {
+                    // Impedir o envio do formulário
+                    e.preventDefault();
+                    
+                    // Salvar estado do carrinho
+                    localStorage.setItem('retornarAoCarrinho', 'true');
+                    
+                    // Alertar o usuário
+                    alert('Você precisa cadastrar um endereço para entrega antes de finalizar o pedido.');
+                    
+                    // Redirecionar para a página de perfil com parâmetro para abrir o formulário
+                    window.location.href = '../perfil.php?adicionar_endereco=1&retorno=carrinho';
+                }
+            }
+        });
     });
 </script>
 
