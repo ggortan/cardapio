@@ -66,7 +66,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Login - Cardápio Digital</title>
+    <title>Login - GastroHub</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .login-container {
@@ -80,7 +80,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div class="login-container">
             <div class="card shadow">
                 <div class="card-header text-center bg-primary text-white">
-                    <h3>Cardápio Digital</h3>
+                    <h3>GastroHub</h3>
                 </div>
                 <div class="card-body">
                     <?php displayFlashMessage(); ?>
