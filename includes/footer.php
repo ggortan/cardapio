@@ -32,7 +32,7 @@
                     <p class="small mb-0">&copy; <?php echo date('Y'); ?> GastroHub. Todos os direitos reservados.</p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <p class="small mb-0">Desenvolvido por <?php echo htmlspecialchars('Seu Nome'); ?></p>
+                    <p class="small mb-0">Desenvolvido por <?php echo htmlspecialchars('Gabriel Gortan'); ?></p>
                 </div>
             </div>
         </div>
