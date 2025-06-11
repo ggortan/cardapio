@@ -178,7 +178,7 @@ $promocao = $promocoes[$promo_index];
     </nav>
 
     <!-- Banner Promocional -->
-    <div class="container mt-4">
+    <!--div class="container mt-4">
         <div class="banner" style="background-image: url('<?php echo $promocao['imagem']; ?>');">
             <div class="banner-content">
                 <h2><?php echo htmlspecialchars($promocao['titulo']); ?></h2>
@@ -186,7 +186,7 @@ $promocao = $promocoes[$promo_index];
                 <a href="cadastro.php" class="btn btn-primary">Cadastre-se para pedir</a>
             </div>
         </div>
-    </div>
+</div-->
 
     <!-- Navegação das Categorias -->
     <div class="category-nav">
