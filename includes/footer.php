@@ -7,7 +7,7 @@
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <h5>Cardápio Digital</h5>
+                    <h5>GastroHub</h5>
                     <p class="small">Sistema de gerenciamento de pedidos online para restaurantes e estabelecimentos de alimentação.</p>
                 </div>
                 <div class="col-md-3">
@@ -22,14 +22,14 @@
                     <h5>Contato</h5>
                     <ul class="list-unstyled">
                         <li><i class="bi bi-telephone"></i> (00) 00000-0000</li>
-                        <li><i class="bi bi-envelope"></i> contato@cardapiodigital.com</li>
+                        <li><i class="bi bi-envelope"></i> contato@email.com</li>
                     </ul>
                 </div>
             </div>
             <hr>
             <div class="row">
                 <div class="col-md-6">
-                    <p class="small mb-0">&copy; <?php echo date('Y'); ?> Cardápio Digital. Todos os direitos reservados.</p>
+                    <p class="small mb-0">&copy; <?php echo date('Y'); ?> GastroHub. Todos os direitos reservados.</p>
                 </div>
                 <div class="col-md-6 text-md-end">
                     <p class="small mb-0">Desenvolvido por <?php echo htmlspecialchars('Seu Nome'); ?></p>
