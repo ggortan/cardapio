@@ -157,7 +157,7 @@ $promocao = $promocoes[$promo_index];
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container">
             <a class="navbar-brand" href="index.php">
-                <i class="bi bi-book"></i> Cardápio Digital
+                <i class="bi bi-book"></i> GastroHub
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
@@ -315,7 +315,7 @@ $promocao = $promocoes[$promo_index];
         <div class="container">
             <div class="row">
                 <div class="col-md-6">
-                    <h5>Cardápio Digital</h5>
+                    <h5>GastroHub</h5>
                     <p class="small">Sistema de gerenciamento de pedidos online para restaurantes e estabelecimentos de alimentação.</p>
                 </div>
                 <div class="col-md-3">
@@ -337,10 +337,10 @@ $promocao = $promocoes[$promo_index];
             <hr>
             <div class="row">
                 <div class="col-md-6">
-                    <p class="small mb-0">&copy; <?php echo date('Y'); ?> Cardápio Digital. Todos os direitos reservados.</p>
+                    <p class="small mb-0">&copy; <?php echo date('Y'); ?> GastroHub. Todos os direitos reservados.</p>
                 </div>
                 <div class="col-md-6 text-md-end">
-                    <p class="small mb-0">Desenvolvido por <?php echo htmlspecialchars('Seu Nome'); ?></p>
+                    <p class="small mb-0">Desenvolvido por <?php echo htmlspecialchars('Gabriel Gortan'); ?></p>
                 </div>
             </div>
         </div>
