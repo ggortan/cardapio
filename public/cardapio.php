@@ -187,7 +187,7 @@ require_once '../includes/header.php';
 </style>
 
 <!-- Banner Promocional -->
-<div class="banner" style="background-image: url('<?php echo $promocao['imagem']; ?>');">
+<!--div class="banner" style="background-image: url('<?php echo $promocao['imagem']; ?>');">
     <div class="banner-content">
         <h2><?php echo htmlspecialchars($promocao['titulo']); ?></h2>
         <p class="lead"><?php echo htmlspecialchars($promocao['descricao']); ?></p>
@@ -195,7 +195,7 @@ require_once '../includes/header.php';
             <i class="bi bi-cart"></i> Ver meu carrinho
         </button>
     </div>
-</div>
+</div-->
 
 <!-- Navegação das Categorias -->
 <div class="category-nav">
